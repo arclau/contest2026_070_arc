@@ -1,0 +1,26 @@
+# ============================================================
+# 编译产物 / 本地凭证 —— 勿提交
+#
+# 注意：logs/ 下导出的 AI Coding 日志必须提交，不要在这里忽略！
+# ============================================================
+
+# Build artifacts
+build/
+out/
+*.o
+*.a
+*.elf
+*.hex
+*.map
+*.su
+.built
+.depend
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 本地凭证（永不提交）：照 r528/agent_secrets.h.example 复制改名后填入
+**/agent_secrets.h
+*.env
+config.json
