@@ -9,8 +9,10 @@
   <include name="openvela.xml"/>
 
   <project path="contest2026_070_arc" name="contest2026_070_arc">
-    <linkfile src="app/hello_app" dest="packages/demos/contest2026_070_hello_app"/>
-    <linkfile src="quickapp/hello_quickapp" dest="packages/apps/contest2026_070_hello_quickapp"/>
-    <linkfile src="board/contest_board" dest="vendor/openvela/boards/contest2026_070_board"/>
+    <!-- R528 DesktopMate：桌面宠物 + AI 语音（2026-09-09 映射方案定稿） -->
+    <linkfile src="r528/luncher_dm" dest="vendor/allwinnertech/apps/luncher_dm"/>
+    <linkfile src="r528/deskmate" dest="vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/deskmate"/>
+    <linkfile src="r528/res_tones" dest="vendor/allwinnertech/lichee/board/common/data/res/tones"/>
+    <!-- AI 凭证模板：r528/agent_secrets.h.example → 手动 cp 为 packages/ai_agent/include/agent_secrets.h 后填 key -->
   </project>
 </manifest>
