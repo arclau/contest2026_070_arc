@@ -21,7 +21,7 @@ extern "C" {
 #define DM_ALS_DARK_EXIT_LUX   8       /* 退出迟滞：lux ≥ 此值才判"光线恢复"并复位
                                         * 状态机；1~7 lux 灰区保持当前状态，
                                         * 避免传感器在阈值边缘抖动导致反复重弹 */
-#define DM_ALS_DARK_DEBOUNCE_MS 120000 /* 连续低于阈值 2 分钟才触发 */
+#define DM_ALS_DARK_DEBOUNCE_MS 60000  /* 连续低于阈值 1 分钟才触发 */
 #define DM_ALS_DARK_COOLDOWN_MS 0       /* 无冷却：每次恢复再暗都弹窗 */
 #define DM_ALS_POLL_MS         1000    /* 轮询周期（与驱动 ALS 出数节奏匹配） */
 #define DM_ALS_STARTUP_MS      20000   /* 开机稳定期：此期间不触发暗光弹窗

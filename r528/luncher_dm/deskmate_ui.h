@@ -305,6 +305,7 @@ void ui_wifi_close_cleanup(void);           /* ui_wifi.c：密码层等根屏 ov
 void ui_bt_create(lv_obj_t *parent);        /* ui_bt.c */
 void ui_books_create(lv_obj_t *parent);     /* ui_books.c */
 void book_reader_close(void);               /* ui_books.c：close_subpage 清理阅读器 */
+void dm_subpage_back_btn_set_hidden(bool hidden);  /* ui_books.c：阅读器开/关时藏/显全局返回键 */
 void ui_files_create(lv_obj_t *parent);     /* ui_files.c */
 void files_ui_clear_ptrs(void);             /* ui_files.c：close_subpage 清理多选栏 */
 void ui_settings_create(lv_obj_t *parent);  /* ui_settings.c */
