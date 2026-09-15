@@ -529,11 +529,19 @@ void ui_music_create(lv_obj_t *parent)
         g_music_timer = lv_timer_create(music_timer_cb, 500, NULL);
         lv_timer_set_repeat_count(g_music_timer, -1);
     }
-    lv_timer_pause(g_music_timer);
-    music_playing = false;
     music_active_btn = NULL;
-    music_track_id = music_state_load();   /* resume last-played track */
-    if (music_track_id >= dm_track_count)
-        music_track_id = 0;
+    if (music_playing) {
+        /* 2026-09-15：重进时后台正在播，不要重置为停止态。music_playing
+         * 在 close_subpage 未被清，仍反映后端真实状态。直接恢复播放态 UI
+         *（按钮置 PAUSE + timer 恢复，进度/时间由 500ms timer 接管刷新）；
+         * 曲目保持当前 music_track_id（自动连播已推进），不读盘覆盖。
+         * music_resume 内 audio 已在播时 resume 为空操作。 */
+        music_resume();
+    } else {
+        lv_timer_pause(g_music_timer);
+        music_track_id = music_state_load();   /* resume last-played track */
+        if (music_track_id >= dm_track_count)
+            music_track_id = 0;
+    }
     music_update_track_info();   /* show remembered / first track / "No track" hint */
 }

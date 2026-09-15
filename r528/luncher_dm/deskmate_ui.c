@@ -131,6 +131,7 @@ void ui_alarm_close_cleanup(void);        /* ui_alarm.c：close_subpage 清理 *
 void ui_datetime_create(lv_obj_t *parent); /* ui_datetime.c（2026-09-10 P211 日期与时间） */
 void ui_datetime_close_cleanup(void);     /* ui_datetime.c：close_subpage 清理 */
 void book_reader_close(void);             /* ui_books.c：close_subpage 清理（deskmate_ui.h 已声明） */
+void book_del_popup_close(void);          /* ui_books.c：删书确认遮罩（挂根屏）清理 */
 
 /* Phase 1 拆分：books 共享状态（ui_books.c 导出，files_open_file 引用） */
 #define DM_MAX_BOOKS   32
@@ -552,6 +553,13 @@ lv_obj_t      *subpage_weather_lbl;
 lv_obj_t      *subpage_wifi_lbl;
 lv_obj_t      *subpage_bt_lbl;
 
+/* 2026-09-15：子页返回键改挂 lv_layer_top()（全局唯一，跨子页复用）。
+ * 原为 subpage_overlay 子对象，各 APP 内部再开的全屏浮层（播放列表/
+ * 日历事件面板/阅读器/WiFi 密码层/键盘）会 move_foreground 盖到它上面，
+ * 第一下点返回被浮层吃掉 → "点多次才回 Home"。挂 layer_top 后恒在任何
+ * 页面内容之上。close_subpage 完全关闭时销毁。 */
+static lv_obj_t *subpage_back_btn;
+
 /* Phase 1 拆分：WiFi 子页 static 状态已移至 ui/ui_wifi.c */
 
 /* Phase 1 拆分：蓝牙子页 static 状态已移至 ui/ui_bt.c */
@@ -843,6 +851,8 @@ void close_subpage(void)
         ui_wifi_close_cleanup();
         /* 阅读器覆盖层挂在根屏幕，不随 subpage_overlay 删除——显式清理 */
         book_reader_close();
+        book_del_popup_close();   /* 2026-09-15：删书确认遮罩挂根屏，返回键现
+                                   * 浮动在其上，必须显式清否则残留吞点击 */
         /* Files 多选操作栏/上级按钮（挂 overlay/content 上）——删除前置空 */
         files_ui_clear_ptrs();
         /* UART 调试工具：停刷新 timer + 关串口（内部恢复 LD2410B） */
@@ -886,8 +896,10 @@ void close_subpage(void)
             }
         /* 2026-08-15 P83：不再自动发 wake_start（纯按钮 PTT），
          * 此处 wake_stop 仅防御性保留——若旧固件/其他路径曾启动过
-         * wake 线程，退出子页确保停掉，避免残留监听抢声卡 */
-        dm_ai_voice("wake_stop");
+         * wake 线程，退出子页确保停掉，避免残留监听抢声卡。
+         * 2026-09-15：改非阻塞版——原 dm_ai_voice 在 UI 线程最多忙等
+         * 500ms（等上一轮 worker），回到 Home 必经此路 → 所有子页共病卡顿。 */
+        dm_ai_voice_try("wake_stop");
         /* 2026-08-23 review-7：不再 dm_ai_voice_evt_unsubscribe()——
          * 语音事件订阅已改系统级常驻（deskmate_ui_create），退出 AI 子页
          * 停订阅会导致锁屏/主界面语音命令（cmd 事件）收不到。订阅线程
@@ -906,6 +918,12 @@ void close_subpage(void)
             subpage_parent  = NULL;
             lv_obj_move_foreground(subpage_overlay);
             return;
+        }
+
+        /* 完全关闭（无父嵌套）：销毁 layer_top 上的浮动返回键 */
+        if (subpage_back_btn) {
+            lv_obj_del(subpage_back_btn);
+            subpage_back_btn = NULL;
         }
 
         /* Restore dock — but not while standby is showing (standby hides
@@ -1059,6 +1077,50 @@ static void subpage_back_cb(lv_event_t *e)
     close_subpage();
 }
 
+/* 返回键：挂 lv_layer_top()，全子页复用同一实例（嵌套子页不重复创建），
+ * 位于所有页面内容（含 APP 内部全屏浮层）之上，任何时刻点都能命中。 */
+static void dm_subpage_back_btn_show(void)
+{
+    lv_obj_t *btn = subpage_back_btn;
+    if (btn && lv_obj_is_valid(btn)) {
+        lv_obj_clear_flag(btn, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(btn);
+        return;
+    }
+    btn = lv_btn_create(lv_layer_top());
+    lv_obj_set_size(btn, DM(40), DM(40));
+    /* 2026-08-10 修复（-23）：状态栏 132px 全宽固定顶部，返回键必须下移
+     * 让出状态栏，禁止元素冲突（deskmate-ui skill 铁律2） */
+    lv_obj_set_pos(btn, DM(16), TOP_BAR_H + DM(4));
+    lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(COL_CARD), 0);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_80, 0);
+    lv_obj_set_style_shadow_width(btn, 0, 0);
+    lv_obj_set_style_border_width(btn, 0, 0);
+    lv_obj_add_event_cb(btn, subpage_back_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *icon = lv_label_create(btn);
+    lv_label_set_text(icon, LV_SYMBOL_LEFT);
+    lv_obj_set_style_text_font(icon, FONT_ICON, 0);
+    lv_obj_set_style_text_color(icon, lv_color_hex(COL_BLUE), 0);
+    lv_obj_center(icon);
+    lv_obj_move_foreground(btn);
+    subpage_back_btn = btn;
+}
+
+/* 阅读器开/关时藏/显全局返回键（阅读器自带返回键，避免双返回键）。
+ * close_subpage 完全关闭子页时会销毁返回键，此处仅藏显、不销毁。 */
+void dm_subpage_back_btn_set_hidden(bool hidden)
+{
+    if (subpage_back_btn && lv_obj_is_valid(subpage_back_btn)) {
+        if (hidden)
+            lv_obj_add_flag(subpage_back_btn, LV_OBJ_FLAG_HIDDEN);
+        else {
+            lv_obj_clear_flag(subpage_back_btn, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_move_foreground(subpage_back_btn);
+        }
+    }
+}
+
 /* Phase 1 拆分：show_subpage 被 ui_settings.c（WiFi/蓝牙嵌套子页入口）extern 引用 */
 void show_subpage(const char *title)
 {
@@ -1119,26 +1181,12 @@ void show_subpage(const char *title)
     lv_anim_set_path_cb(&slide_in, lv_anim_path_ease_out);
     lv_anim_start(&slide_in);
 
-    /* Round back button — frosted glass, below the status bar (top-left) */
-    lv_obj_t *back_btn = lv_btn_create(subpage_overlay);
-    lv_obj_set_size(back_btn, DM(40), DM(40));
-    /* 2026-08-10 修复（-23）：状态栏 132px 全宽固定顶部，返回键必须下移
-     * 让出状态栏，禁止元素冲突（deskmate-ui skill 铁律2） */
-    lv_obj_set_pos(back_btn, DM(16), TOP_BAR_H + DM(4));
+    /* Round back button — 挂 lv_layer_top()，恒在页面内容之上（见
+     * dm_subpage_back_btn_show 说明）。全子页复用同一实例。 */
     assert(DM(16) + DM(40) <= sw && TOP_BAR_H + DM(4) + DM(40) <= sh &&
            "deskmate: 返回键越界");
-    lv_obj_set_style_radius(back_btn, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(back_btn, lv_color_hex(COL_CARD), 0);
-    lv_obj_set_style_bg_opa(back_btn, LV_OPA_80, 0);
-    lv_obj_set_style_shadow_width(back_btn, 0, 0);
-    lv_obj_set_style_border_width(back_btn, 0, 0);
-    lv_obj_add_event_cb(back_btn, subpage_back_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t *back_icon = lv_label_create(back_btn);
-    lv_label_set_text(back_icon, LV_SYMBOL_LEFT);
-    lv_obj_set_style_text_font(back_icon, FONT_ICON, 0);
-    lv_obj_set_style_text_color(back_icon, lv_color_hex(COL_BLUE), 0);
-    lv_obj_center(back_icon);
+    dm_subpage_back_btn_show();
+    lv_obj_t *back_btn = subpage_back_btn;
 
     /* ── 2026-08-10 子页状态栏：与 Home 顶部完全一致（132px 全宽）──
      * 复用 create_status_bar_ex（ui_home.c）：左时钟两行(时间/周几日期) +
@@ -3624,9 +3672,32 @@ static void create_ai_subpage(lv_obj_t *parent)
  * Phase 1 拆分：主界面构建已搬至 ui/ui_home.c（ui_home_create）
  * ================================================================ */
 
+/* ================================================================
+ * 帧率显示（2026-09-16 v4：LVGL 内置 perf 浮窗）
+ * 自定义的右上角 FPS 角标已删除；只保留 LVGL 内置的右下角黑底浮窗
+ * （LV_USE_PERF_MONITOR，默认 LV_ALIGN_BOTTOM_RIGHT 对齐 layer_sys）。
+ * 这里只负责把它整体放大一倍：默认字号(14px) → montserrat_30，内边距
+ * 3 → 6。浮窗由 LVGL 在 display 就绪后异步创建，故用定时器轮询到它
+ * 出现再设置一次，随后自删。
+ * ================================================================ */
+static void dm_sysmon_style_cb(lv_timer_t *t)
+{
+    lv_obj_t *sysmon = lv_obj_get_child(lv_layer_sys(), 0);
+    if (sysmon == NULL)
+        return;   /* 内置浮窗还没建好，下个周期再试 */
+
+    lv_obj_set_style_text_font(sysmon, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_pad_all(sysmon, 5, 0);
+    lv_timer_delete(t);
+}
+
 void deskmate_ui_create(void)
 {
     ui_home_create();
+    /* 2026-09-16 右下角帧率浮窗整体放大一倍（等内置浮窗建好后一次性设置） */
+    lv_timer_t *sysmon_timer = lv_timer_create(dm_sysmon_style_cb, 300, NULL);
+    if (sysmon_timer)
+        lv_timer_set_repeat_count(sysmon_timer, -1);
     /* 2026-08-23 常驻化（review-7）：语音事件订阅 + cmd 消费改为系统级常驻，
      * 不随 AI 子页启停——修复锁屏/主界面按语音按钮说话（standby_ai_btn 复用
      * PTT）时 cmd 事件无人消费（AI 子页未开 → ai_poll_cb 不存在）导致

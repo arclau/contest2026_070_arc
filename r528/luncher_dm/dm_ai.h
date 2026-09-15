@@ -29,6 +29,9 @@ int dm_ai_busy(void);
  * Non-blocking fire-and-forget via a background thread; returns 0 if
  * queued, -1 if action invalid or a voice command is already in flight. */
 int dm_ai_voice(const char *action);
+/* 非阻塞版（UI 线程用）：上一轮 worker 未收尾时直接返回 -1，不做
+ * ≤500ms 忙等。close_subpage 的防御性 wake_stop 用此版，避免主线程 stall。 */
+int dm_ai_voice_try(const char *action);
 
 /* 2026-08-15 健康助理：直接 TTS 播报指定文本（健康提醒 L2/L3 语音触达）。
  * 发送 {"type":"voice","action":"speak","text":"..."} → agent 侧

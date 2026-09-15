@@ -4,8 +4,8 @@
  *
  * 设计定稿：project_docs/specs/health-assistant-design.md
  *  - 接近传感器判定坐下/离开（防抖），离开清零重来
- *  - 喝水：L1 45min（天热 30min）→ 两键弹窗 → "先不喝" 15min 升级一档
- *  - 久坐：30/60/90min 三级，同套路
+ *  - 喝水：L1 45min（天热 30min）→ 两键弹窗 → "先不喝" 每 15min 持续催
+ *  - 久坐：L1 30min → "继续坐" 每 20min 持续催（不退避，直到起立）
  *  - 数据持久化 /data/dm_health.state（yaffs，仿 dm_music.state）
  *
  * 线程模型：状态机跑在 LVGL 主线程（1s lv_timer），UI 事件经回调同步触发。
