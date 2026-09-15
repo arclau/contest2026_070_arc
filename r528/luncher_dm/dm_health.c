@@ -56,9 +56,8 @@
 #define WATER_HOT_L1_S        1800  /* 30min（≥30℃ 天热） */
 #define WATER_HOT_TEMP_C      30
 #define WATER_ESCALATE_S      900   /* "先不喝"后 15min 升档 */
-#define SIT_L1_S              1800  /* 30min */
-#define SIT_L2_S              3600  /* 60min */
-#define SIT_L3_S              5400  /* 90min */
+#define SIT_L1_S              1800  /* 30min（首次） */
+#define SIT_ESCALATE_S        1200  /* "继续坐"后 20min 持续催（不退避，直到起立） */
 
 /* 配置读取简写：key 缺项回退默认宏 */
 #define CFG_I(key, def)  dm_health_cfg_get_int(key, def)
@@ -463,16 +462,10 @@ void dm_health_sit_snooze(void)
     g_decline_cnt++;        /* Step 1：继续坐=拒绝一次 */
     if (g_sit_level > 0 && g_sit_remain_s == 0)
     {
-        if (g_sit_level == 1)
-        {
-            g_sit_total_s = CFG_I("sit_l2_s", SIT_L2_S);
-            g_sit_remain_s = g_sit_total_s;
-        }
-        else
-        {
-            g_sit_total_s = CFG_I("sit_l3_s", SIT_L3_S);
-            g_sit_remain_s = g_sit_total_s;
-        }
+        /* 2026-09-14 P237：拒绝不退避——固定 20min 持续催，直到起立。
+         * 旧逻辑 L1→60min→90min 越拒越疏，与"久没做就骚扰"定位相反。 */
+        g_sit_total_s = CFG_I("sit_escalate_s", SIT_ESCALATE_S);
+        g_sit_remain_s = g_sit_total_s;
         LV_LOG_USER("[health] sit snooze, next L%d in %ds",
                     g_sit_level + 1, g_sit_remain_s);
     }

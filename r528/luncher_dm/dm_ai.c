@@ -551,7 +551,7 @@ static void *ai_voice_worker(void *arg)
     return NULL;
 }
 
-int dm_ai_voice(const char *action)
+static int ai_voice_send(const char *action, int wait)
 {
     if (!action || (strcmp(action, "start") != 0 &&
                     strcmp(action, "stop") != 0 &&
@@ -561,9 +561,12 @@ int dm_ai_voice(const char *action)
         return -1;
     /* 2026-08-12 审查修复（B4）：上一轮 worker（如快速点按的 start）未
      * 结束时直接返回会丢消息——release 的 stop 被拒 → agent 一直录音。
-     * 短忙等 ≤500ms 等 worker 收尾再发，避免丢帧（localhost 发送 <10ms）。 */
-    for (int tries = 0; g_ai_voice_busy && tries < 50; tries++)
-        usleep(10 * 1000);
+     * 短忙等 ≤500ms 等 worker 收尾再发，避免丢帧（localhost 发送 <10ms）。
+     * UI 线程（close_subpage）传 wait=0 跳过等待，避免主线程 stall。 */
+    if (wait) {
+        for (int tries = 0; g_ai_voice_busy && tries < 50; tries++)
+            usleep(10 * 1000);
+    }
     if (g_ai_voice_busy)
         return -1;
 
@@ -578,6 +581,16 @@ int dm_ai_voice(const char *action)
         }
     pthread_detach(g_ai_thread);
     return 0;
+}
+
+int dm_ai_voice(const char *action)
+{
+    return ai_voice_send(action, 1);
+}
+
+int dm_ai_voice_try(const char *action)
+{
+    return ai_voice_send(action, 0);
 }
 
 /* ── 2026-08-15 健康助理：直接 TTS 播报文本（健康提醒 L2/L3 语音触达）──

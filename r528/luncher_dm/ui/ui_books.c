@@ -980,6 +980,12 @@ static void book_del_hide(void)
     book_longpress_suppress = 0;
 }
 
+/* close_subpage 清理入口（删书遮罩挂根屏，不随子页 overlay 删除） */
+void book_del_popup_close(void)
+{
+    book_del_hide();
+}
+
 static void book_del_confirm_cb(lv_event_t *e)
 {
     lv_event_stop_bubbling(e);   /* 阻断向 scrim 冒泡：防确认后又触发取消/二次 hide */
@@ -1108,6 +1114,8 @@ void book_reader_close(void)
         book_all_loaded = 0;
         book_win_busy = 0;
     }
+    /* 回到书架：恢复全局返回键（阅读器自带的已随 overlay 销毁） */
+    dm_subpage_back_btn_set_hidden(false);
 }
 
 static void book_reader_back_cb(lv_event_t *e)
@@ -1430,6 +1438,8 @@ void book_open_reader(int idx)
     lv_obj_set_style_pad_all(book_reader_overlay, 0, 0);
     lv_obj_clear_flag(book_reader_overlay, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_move_foreground(book_reader_overlay);
+    /* 阅读器自带返回键：藏起 layer_top 上的全局返回键，避免双返回键 */
+    dm_subpage_back_btn_set_hidden(true);
 
     /* 顶部：返回按钮（玻璃圆形）*/
     lv_obj_t *back_btn = lv_btn_create(book_reader_overlay);
