@@ -68,7 +68,7 @@
 | 8 | **LVGL 大屏 UI** | 全程，6 个大版本 | 字体 fallback 链（montserrat 缺字形）；`lv_color_t` 3B 越界 16KB（Data Abort）；flex 覆盖 `set_width`；矩阵旋转不兼容 |
 
 
-**硬件设计与适配**：全新硬件平台适配（R528 BSP + 无 datasheet 屏逆向）。拆U逆向屏幕引脚定义、嘉立创EDA画板、PCB板焊接、驱动/适配：MIPI DSI 面板（新增）、GT9271 触摸、DSI 链路加固、`sun8iw20-codec`（麦克风关断 POP）、LTR553 ALS（积分时间×增益校正）、SD-MMC 多块读修复、UART/LD2410B 换口与引脚冲突。
+**硬件设计与适配**：全新硬件平台适配（R528 BSP + 无 datasheet 屏逆向）。拆U逆向屏幕引脚定义、嘉立创EDA画板、PCB板焊接、驱动/适配：MIPI DSI 面板（新增）、GT9271 触摸、DSI 链路加固、`sun8iw20-codec`（麦克风关断 POP）、LTR553 ALS（积分时间×增益校正）、SD-MMC 多块读修复、UART/LD2410B 换口与引脚冲突。**上述驱动源码随仓提供，见 `r528/vendor_drivers/`**（经 `contest2026_070_arc.xml` 的 linkfile/copyfile 映射回 `vendor/allwinnertech/`）。
 **选型教训**：早期评估 **6 英寸 2160×1080** 屏不可用——能点亮、纯色正常，但一进 LVGL UI 即扭曲畸变，确认为**超出 R528 显示链路上限**；教训：选屏先确认 SoC 显示上限再投入。
 <img width="2778" height="1282" alt="img_v3_0213q_dd5d138b-13b7-46f3-a63c-824d83cdd16g" src="https://github.com/user-attachments/assets/63ceb76b-8ad5-47e8-a4fa-4d12ec1c00ce" />
 
@@ -84,6 +84,7 @@
 | `r528/luncher_dm/` | 桌面主应用（UI+宠物+AI+网络+天气+音乐） | `vendor/allwinnertech/apps/luncher_dm` |
 | `r528/deskmate/` | 板级提交配置 defconfig | `.../r528s3-gemini-s1/configs/deskmate` |
 | `r528/res_tones/` | 新增提示音 wav（23 个） | `lichee/board/common/data/res/tones` |
+| `r528/vendor_drivers/` | 板级驱动源码镜像（BOE 面板 / GT9271 触摸 / ltr553 / codec / de_dsi / WiFi 重试） | 经 linkfile+copyfile 映射到 `vendor/allwinnertech/...` |
 | `r528/agent_secrets.h.example` | AI 凭证模板（真文件永不进仓） | 手动 cp 到 `packages/ai_agent/include/agent_secrets.h` |
 | `logs/` | **AI Coding 会话日志**（149 会话，见 `logs/README.md`） | 作品提交要求 |
 | `skills/` | Skill：`dts-to-vela-mipi` / `deskmate-ui` / `product-designer-ui` / `ai-devlog-system` / `deskmate-agent` / `devlog` / `contest-log-collector` | AI 开发证据 |
