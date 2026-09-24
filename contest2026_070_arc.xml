@@ -13,6 +13,32 @@
     <linkfile src="r528/luncher_dm" dest="vendor/allwinnertech/apps/luncher_dm"/>
     <linkfile src="r528/deskmate" dest="vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/deskmate"/>
     <linkfile src="r528/res_tones" dest="vendor/allwinnertech/lichee/board/common/data/res/tones"/>
+    <!-- 驱动源码镜像：新增走 linkfile，改动上游文件走 copyfile（linkfile 无法覆盖上游已跟踪文件） -->
+    <!-- 新增（上游不存在，linkfile 映射；apps/gt9271_touch_test 为整目录） -->
+    <linkfile src="r528/vendor_drivers/apps/gt9271_touch_test" dest="vendor/allwinnertech/apps/gt9271_touch_test"/>
+    <linkfile src="r528/vendor_drivers/boards/r528/drivers/gt9271_iic_touch.c" dest="vendor/allwinnertech/boards/r528/drivers/gt9271_iic_touch.c"/>
+    <linkfile src="r528/vendor_drivers/boards/r528/drivers/gt9271_iic_touch.h" dest="vendor/allwinnertech/boards/r528/drivers/gt9271_iic_touch.h"/>
+    <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.c"/>
+    <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.h" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.h"/>
+    <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/BOE_1200x1920_mipi_config.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/BOE_1200x1920_mipi_config.c"/>
+    <!-- 改动（覆盖上游已跟踪文件，copyfile；增量重 sync 需加 force-sync 参数） -->
+    <copyfile src="r528/vendor_drivers/boards/r528/drivers/Kconfig" dest="vendor/allwinnertech/boards/r528/drivers/Kconfig"/>
+    <copyfile src="r528/vendor_drivers/boards/r528/r528s3-gemini-s1/src/Makefile" dest="vendor/allwinnertech/boards/r528/r528s3-gemini-s1/src/Makefile"/>
+    <copyfile src="r528/vendor_drivers/boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_conf.c" dest="vendor/allwinnertech/boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_conf.c"/>
+    <copyfile src="r528/vendor_drivers/boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_util.c" dest="vendor/allwinnertech/boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_util.c"/>
+    <copyfile src="r528/vendor_drivers/boards/r528/drivers/realtek_ieee80211/os/customer_rtos/customer_rtos_service.c" dest="vendor/allwinnertech/boards/r528/drivers/realtek_ieee80211/os/customer_rtos/customer_rtos_service.c"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/r528_boot.c" dest="vendor/allwinnertech/chips/r528/r528_boot.c"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/Make.defs" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/Make.defs"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/Makefile" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/Makefile"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/de/lowlevel_v2x/de_dsi.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/de/lowlevel_v2x/de_dsi.c"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/dev_fb.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/dev_fb.c"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/Kconfig" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/Kconfig"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/panels.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/panels.c"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/panels.h" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/panels.h"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/Kconfig" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/Kconfig"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/Makefile" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/Makefile"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/sensor/als/ltr553.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/sensor/als/ltr553.c"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/sound/codecs/sun8iw20-codec.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/sound/codecs/sun8iw20-codec.c"/>
     <!-- AI 凭证模板：r528/agent_secrets.h.example → 手动 cp 为 packages/ai_agent/include/agent_secrets.h 后填 key -->
   </project>
 </manifest>

@@ -1,0 +1,139 @@
+ifeq ($(CONFIG_DISP2_SUNXI),y)
+# Include platform's table.
+# Include build support
+
+DRV_SOURCE_PATH=drivers/rtos-hal/hal/source
+DISP_PATH=drivers/rtos-hal/hal/source/disp2
+
+DEPPATH+=--dep-path $(DISP_PATH) 
+VPATH+=:chip/$(DISP_PATH)
+
+ARCH_SRC := $(TOPDIR)/arch/$(CONFIG_ARCH)/src
+ARCH_INC := $(TOPDIR)/arch/$(CONFIG_ARCH)/include
+ARCH_DISP_SRC_PATH:=$(ARCH_SRC)/$(CONFIG_ARCH_CHIP)/$(DISP_PATH)
+
+CFLAGS += ${INCDIR_PREFIX}$(ARCH_DISP_SRC_PATH)
+CFLAGS += ${INCDIR_PREFIX}$(ARCH_DISP_SRC_PATH)/soc
+CFLAGS += ${INCDIR_PREFIX}$(AW_SRCDIR)/$(DISP_PATH)/soc
+
+# Include the  module.
+CHIP_CSRCS += $(DISP_PATH)/soc/sun8iw20.c
+
+ifeq ($(CONFIG_ARCH_BOARD_R528S3_EVB2), y)
+CHIP_CSRCS += $(DISP_PATH)/soc/gc9503cv_mipi_config_evb2.c
+endif
+
+ifeq ($(CONFIG_ARCH_BOARD_R528S3_EVB4), y)
+ifeq ($(CONFIG_LCD_SUPPORT_T070S140B),y)
+CHIP_CSRCS += $(DISP_PATH)/soc/t070s140b_mipi_config.c
+endif
+ifeq ($(CONFIG_LCD_SUPPORT_SSD1306),y)
+CHIP_CSRCS += $(DISP_PATH)/soc/ssd1306_spi_config.c
+endif
+endif
+
+ifeq ($(CONFIG_ARCH_BOARD_R528S3_GEMINI_S1), y)
+ifeq ($(CONFIG_LCD_SUPPORT_T070S140B),y)
+CHIP_CSRCS += $(DISP_PATH)/soc/t070s140b_mipi_config.c
+endif
+ifeq ($(CONFIG_LCD_SUPPORT_BOE_1200X1920),y)
+CHIP_CSRCS += $(DISP_PATH)/soc/BOE_1200x1920_mipi_config.c
+endif
+endif
+
+
+ifeq ($(CONFIG_ARCH_BOARD_R528S3_X4B), y)
+CHIP_CSRCS += $(DISP_PATH)/soc/gc9503cv_mipi_config_x4b.c
+endif
+CHIP_CSRCS += $(DISP_PATH)/soc/disp_board_config.c
+CHIP_CSRCS += $(DISP_PATH)/soc/platform_resource.c
+CHIP_CSRCS += $(DISP_PATH)/disp/dev_disp.c
+CHIP_CSRCS += $(DISP_PATH)/disp/disp_sys_intf.c
+#CHIP_CSRCS += $(DISP_PATH)/disp/disp_debug.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_display.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_features.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_device.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_lcd.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_manager.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_private.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_capture.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_tv.c
+
+ifeq ($(CONFIG_DISP2_SUNXI_SUPPORT_ENAHNCE),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_enhance.c
+endif
+
+ifeq ($(CONFIG_DISP2_SUNXI_SUPPORT_SMBL),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_smart_backlight.c
+endif
+
+ifeq ($(CONFIG_SUNXI_DISP2_FB_HW_ROTATION_SUPPORT),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/fb_g2d_rot.c
+endif
+
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_dsi.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_wb.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_lcd_sun50iw10.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_fcc.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_gsu.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_hal.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/disp_al.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_peak.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_rtmx.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_scaler_table.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_vep_table.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_vsu.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_feat.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_lti.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_fce.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_ase.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_bws.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_enhance.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_smbl.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_ccsc.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_dcsc.c
+CHIP_CSRCS += $(DISP_PATH)/disp/de/lowlevel_v2x/de_clock.c
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/panels.c
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/lcd_source.c
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/default_panel.c
+
+ifeq ($(CONFIG_LCD_SUPPORT_GC9503CV),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/gc9503cv.c
+endif
+
+ifeq ($(CONFIG_LCD_SUPPORT_ST7701S),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/st7701s.c
+endif
+
+ifeq ($(CONFIG_LCD_SUPPORT_TFT08006),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/tft08006.c
+endif
+
+ifeq ($(CONFIG_LCD_SUPPORT_T070S140B),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/t070s140b.c
+endif
+
+ifeq ($(CONFIG_LCD_SUPPORT_BOE_1200X1920),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/BOE_1200x1920.c
+endif
+
+ifeq ($(CONFIG_LCD_SUPPORT_SSD1306),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/ssd1306.c
+endif
+
+ifeq ($(CONFIG_LCD_SUPPORT_ILI9341),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/ili9341.c
+CHIP_CSRCS += $(DISP_PATH)/soc/ili9341_lcd_spi.c
+CHIP_CSRCS += $(DISP_PATH)/soc/ili9341_lcd_config.c
+endif
+
+ifeq ($(CONFIG_LCD_SUPPORT_ST7789),y)
+CHIP_CSRCS += $(DISP_PATH)/soc/st7789_lcd_spi.c
+endif
+
+ifeq ($(CONFIG_VIDEO_FB),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/dev_fb.c
+endif
+
+endif
+
