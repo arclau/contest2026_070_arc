@@ -1,0 +1,89 @@
+#
+
+menu "Board Select"
+
+config V459_PERF1
+	bool "board v459 perf1"
+	default n
+	---help---
+	  board v459 perf1
+
+config F133_FPGA
+	bool "board fpga f133"
+	default n
+	---help---
+	  board f133 fpga
+
+config VVX07H005A10_MIPI
+	bool "board, disp with VVX07H005A10_mipi"
+	default n
+	---help---
+	  board, disp with VVX07H005A10_mipi
+
+config HE0801A068_MIPI
+	bool "EVB board, disp with HE0801A068_MIPI"
+	default n
+	---help---
+	  EVB board, disp with HE0801A068_MIPI
+config GC9503CV_MIPI_EVB2
+	bool "EVB2 board, disp with GC9503CV_MIPI"
+	default n
+	---help---
+	  EVB2 board, disp with GC9503CV_MIPI
+config GC9503CV_MIPI_EVB4
+	bool "EVB4 board, disp with GC9503CV_MIPI"
+	default n
+	---help---
+	  EVB4 board, disp with GC9503CV_MIPI
+config DEFAULT_LVDS
+	bool "board, disp with lvds"
+	default n
+	---help---
+	  board, disp with lvds
+
+config T070S140B_MIPI
+	bool "board, disp with T070S140B MIPI"
+	default n
+	---help---
+	  board, disp with T070S140B MIPI 1024x600 panel
+
+config BOE_1200X1920_MIPI
+	bool "board, disp with BOE 1200x1920 MIPI"
+	default n
+	---help---
+	  board, disp with BOE MIPI 1200x1920 panel
+
+config SSD1306_SPI
+	bool "board, disp with SSD1306 SPI"
+	default n
+	---help---
+	  board, disp with SSD1306 SPI 128x64 panel
+endmenu
+
+menu "Soc Select"
+
+config ARCH_SUN8IW19
+	bool "soc sun8iw19"
+	default n
+	---help---
+	  soc sun8iw19
+
+config ARCH_SUN8IW20
+	bool "soc sun8iw20"
+	default n
+	---help---
+	  soc sun8iw20
+
+config ARCH_SUN20IW1
+	bool "soc sun20iw1"
+	default n
+	---help---
+	  soc sun20iw1
+
+config ARCH_SUN20IW2
+	bool "soc sun20iw2"
+	default n
+	---help---
+	  soc sun20iw2
+
+endmenu
