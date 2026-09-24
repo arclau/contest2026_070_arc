@@ -1,0 +1,33 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_GT9271_TOUCH_TEST
+	bool "GT9271 LCD IIC Touchscreen Test Application"
+	default n
+	depends on GT9271_IIC_TOUCH
+	---help---
+		Enable the GT9271 LCD IIC touchscreen test application.
+		This application tests the GT9271 touchscreen functionality
+		by reading touch events and displaying touch coordinates with
+		percentage positions relative to the 1200x1920 LCD screen.
+
+if EXAMPLES_GT9271_TOUCH_TEST
+
+config EXAMPLES_GT9271_TOUCH_TEST_PROGNAME
+	string "GT9271 touch test program name"
+	default "gt9271_touch_test"
+	---help---
+		This is the name of the program that will be used when the NSH ELF
+		program is installed.
+
+config EXAMPLES_GT9271_TOUCH_TEST_PRIORITY
+	int "GT9271 touch test task priority"
+	default 100
+
+config EXAMPLES_GT9271_TOUCH_TEST_STACKSIZE
+	int "GT9271 touch test stack size"
+	default DEFAULT_TASK_STACKSIZE
+
+endif # EXAMPLES_GT9271_TOUCH_TEST

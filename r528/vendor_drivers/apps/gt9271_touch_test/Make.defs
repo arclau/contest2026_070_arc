@@ -1,0 +1,10 @@
+############################################################################
+# apps/examples/gt9271_touch_test/Make.defs
+#
+# GT9271 LCD IIC Touchscreen Test Application Make.defs
+#
+############################################################################
+
+ifneq ($(CONFIG_EXAMPLES_GT9271_TOUCH_TEST),)
+CONFIGURED_APPS += $(APPDIR)/vendor/allwinnertech/apps/gt9271_touch_test
+endif
