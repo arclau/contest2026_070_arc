@@ -1,0 +1,28 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config GT911_IIC_TOUCH
+	bool "GT911 LCD IIC Touchscreen Driver"
+	default n
+	depends on INPUT && DRIVERS_TWI
+	select INPUT_TOUCHSCREEN
+	---help---
+		Enable GT911 LCD IIC touchscreen driver support.
+		This driver provides touchscreen functionality for the GT911
+		LCD module using capacitive touch controller over I2C interface.
+		The driver automatically detects the touch controller type.
+
+config GT9271_IIC_TOUCH
+	bool "GT9271 LCD IIC Touchscreen Driver"
+	default n
+	depends on INPUT && DRIVERS_TWI
+	select INPUT_TOUCHSCREEN
+	---help---
+		Enable GT9271 LCD IIC touchscreen driver support.
+		Register-compatible with GT911 family, ported with coordinate
+		scaling to 1200x1920 BOE panel and I2C failure recovery.
+
+source "drivers/platform/micro_sd/Kconfig"
+source "drivers/platform/realtek_ieee80211/Kconfig"

@@ -1,0 +1,173 @@
+/* Copyright (c) 2019-2025 Allwinner Technology Co., Ltd. ALL rights reserved.
+
+ * Allwinner is a trademark of Allwinner Technology Co.,Ltd., registered in
+ * the the People's Republic of China and other countries.
+ * All Allwinner Technology Co.,Ltd. trademarks are used with permission.
+
+ * DISCLAIMER
+ * THIRD PARTY LICENCES MAY BE REQUIRED TO IMPLEMENT THE SOLUTION/PRODUCT.
+ * IF YOU NEED TO INTEGRATE THIRD PARTY’S TECHNOLOGY (SONY, DTS, DOLBY, AVS OR MPEGLA, ETC.)
+ * IN ALLWINNERS’SDK OR PRODUCTS, YOU SHALL BE SOLELY RESPONSIBLE TO OBTAIN
+ * ALL APPROPRIATELY REQUIRED THIRD PARTY LICENCES.
+ * ALLWINNER SHALL HAVE NO WARRANTY, INDEMNITY OR OTHER OBLIGATIONS WITH RESPECT TO MATTERS
+ * COVERED UNDER ANY REQUIRED THIRD PARTY LICENSE.
+ * YOU ARE SOLELY RESPONSIBLE FOR YOUR USAGE OF THIRD PARTY’S TECHNOLOGY.
+
+
+ * THIS SOFTWARE IS PROVIDED BY ALLWINNER"AS IS" AND TO THE MAXIMUM EXTENT
+ * PERMITTED BY LAW, ALLWINNER EXPRESSLY DISCLAIMS ALL WARRANTIES OF ANY KIND,
+ * WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING WITHOUT LIMITATION REGARDING
+ * THE TITLE, NON-INFRINGEMENT, ACCURACY, CONDITION, COMPLETENESS, PERFORMANCE
+ * OR MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ * IN NO EVENT SHALL ALLWINNER BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS, OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include "panels.h"
+
+struct sunxi_lcd_drv g_lcd_drv;
+
+struct __lcd_panel *panel_array[] = {
+#ifdef CONFIG_EINK_PANEL_USED
+	&default_eink,
+#endif
+	&default_panel,
+#ifdef CONFIG_LCD_SUPPORT_LT070ME05000
+	&lt070me05000_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_T070S140B
+	&t070s140b_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_SSD1306
+	&ssd1306_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_WTQ05027D01
+	&wtq05027d01_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_T27P06
+	&t27p06_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_DX0960BE40A1
+	&dx0960be40a1_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_TFT720_1280
+	&tft720_1280_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_S6D7AA0X01
+	&S6D7AA0X01_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_GG1P4062UTSW
+	&gg1p4062utsw_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_LS029B3SX02
+	&ls029b3sx02_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_HE0801A068
+	&he0801a068_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_INET_DSI_PANEL
+	&inet_dsi_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_LQ101R1SX03
+	&lq101r1sx03_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_TM_DSI_PANEL
+	&tm_dsi_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_ILI9881C
+	&ili9881c_dsi_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_FD055HD003S
+	&fd055hd003s_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_FRD450H40014
+	&frd450h40014_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_H245QBN02
+	&h245qbn02_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_ILI9341
+	&ili9341_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_LH219WQ1
+	&lh219wq1_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_ST7789V
+	&st7789v_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_ST7796S
+	&st7796s_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_ST7701S
+	&st7701s_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_T30P106
+	&t30p106_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_TO20T20000
+	&to20t20000_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_S2003T46G
+	&s2003t46g_panel,
+#endif
+
+#ifdef CONFIG_LCD_SUPPORT_WILLIAMLCD
+	&WilliamLcd_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_WTL096601G03
+	&wtl096601g03_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_RT13QV005D
+	&rt13qv005d_panel,
+#endif
+#ifdef CONFIG_LCD_SUPPORT_ST7789V_CPU
+	&st7789v_cpu_panel,
+#endif
+
+#ifdef CONFIG_LCD_SUPPORT_VVX07H005A10
+	&VVX07H005A10_panel,
+#endif
+
+#ifdef CONFIG_LCD_SUPPORT_TFT08006
+	&tft08006_panel,
+#endif
+
+#ifdef CONFIG_LCD_SUPPORT_GC9503CV
+	&gc9503cv_panel,
+#endif
+
+#ifdef CONFIG_LCD_SUPPORT_B080UAN01_MIPI1200X1920
+	&b080uan01_panel,
+#endif
+
+#ifdef CONFIG_LCD_SUPPORT_BOE_1200X1920
+	&BOE_1200x1920_panel,
+#endif
+
+	NULL,
+};
+
+void lcd_set_panel_funs(void)
+{
+	int i;
+
+	for (i = 0; panel_array[i] != NULL; i++) {
+		sunxi_lcd_set_panel_funs(panel_array[i]->name,
+					 &panel_array[i]->func);
+	}
+}
+
+int lcd_init(void)
+{
+	sunxi_disp_get_source_ops(&g_lcd_drv.src_ops);
+	lcd_set_panel_funs();
+
+	return 0;
+}
+
