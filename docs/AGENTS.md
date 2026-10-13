@@ -89,6 +89,8 @@ bash /data/vela/git_snapshot.sh          # 自动 tag ok-YYYYMMDD-序号，三�
 
 **待上板/续**：①上板烧录 ok-20260911-21 整包并验证剩余 R/V 清单（`verify_checklist.md`）；②交付物视频/照片/海报/PPT；③公共仓 PR（codec POP/DSI超时/BOE面板/ALS/LVGL三fix，去 P140/P141）；④fork PR+CLA；⑤专属仓 push（待点头）。
 
+**📝 入围后补（P218）**：公共仓 LVGL PR 收 Copilot 1 条 finding——`lvgl.mk` 注释「Mirrors the gating in CMakeLists.txt」**指代失实**（真 CMake 门控在 nuttx-apps，非本仓；代码正确、仅注释待改）；**现无公共仓 PR 权限**，恢复后改注释并让 Copilot 复评。详见 `10-10devlog.md`。
+
 **📤 交作业纪律**：只推新增（luncher_dm/deskmate+res新wav）；nsh保持干净；**公共仓改动（驱动+lvgl）须走 PR 到 `dev-ai-contest-2026`**；tests误改禁推；logs/禁手改；赛规见 `project_docs/submission/`。
 
 **📦 版本**：V1.0.0-20260911（YNM-3000）/ V0.0.7-20260905 / V0.0.6-20260904 / V0.0.5（归档 `/data/vela/releases/`，快照 tag 见仓）；版本号由用户决定，AI 只固化 tag + 归档。

@@ -6,7 +6,7 @@
 > **AI 交接：先读 `AGENTS.md`（环境/焦点/纪律）→ 本文件（索引）→ 按需点链接读 `project_docs/devlogs/<M-D>partNdevlog.md`。**
 > 旧节点（8-17 及以前）已归档至 `project_docs/archive/devlog_archive_p73_p100.md` + `devlog_archive_p1_p8.md`；P114~P122续（8-23/26/27）归档至 `devlog_archive_p114_p122.md`，按详情列回溯子文档。
 
-## 当前节点：P217（见下方节点表首行)
+## 当前节点：P218（见下方节点表首行)
 
 ## 节点表
 
@@ -14,6 +14,7 @@
 
 | P | 主题（根因/结论加粗） | 固化 | 详情 |
 |----|----------------------|------|------|
+| 10-10 P218 | ⏳ **公共仓 LVGL PR 收 Copilot finding**：`lvgl.mk` 注释指代失实（CMake 门控实在 nuttx-apps，非本仓）；代码对、仅注释待改；无公共仓 PR 权限，入围后补 | — | **10-10** |
 | 9-11 P217 | ✅ **交作业收尾+发布V1.0.0（YNM-3000）**：日志合规重提(212会话)/运行时Skill×2/报告按模板重写/版本型号/去假天气/README重写；编译打包自证+归档 | ok-20260911-21 | **9-11part2** |
 | 9-11 P216 | ✅ **崩溃挂死6项**：music UAF补空/MONO改#if/wifi built守卫/ai EOF+127帧/uart poll验revents/alarm按行解析 | ok-20260911-20 | **9-11part1** |
 | 9-11 P215 | ⏳ **公共PR去P140/P141**（尾音真因在App侧）+ 子APP遍历**发现多个高危待修** → 暂缓同步fork | — | **9-11part1** |
