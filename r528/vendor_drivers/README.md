@@ -23,43 +23,54 @@
   需 `repo sync --force-sync`）。
 - dest 一律带 `vendor/allwinnertech/` 前缀，与仓内既有 3 条 linkfile 写法一致。
 
-## 一、新增 9 文件（linkfile 映射）
+## 一、新增 18 文件（linkfile 映射）
 
 | # | 路径（相对本目录） | 作用 |
 |---|---|---|
-| 1 | `apps/gt9271_touch_test/Kconfig` | GT9271 触摸自检 APP 的 Kconfig 开关 |
-| 2 | `apps/gt9271_touch_test/Make.defs` | 触摸自检 APP 构建定义 |
-| 3 | `apps/gt9271_touch_test/Makefile` | 触摸自检 APP 构建入口 |
-| 4 | `apps/gt9271_touch_test/gt9271_touch_test_main.c` | 触摸自检 APP 主程序（I2C 读点、坐标上报自检） |
-| 5 | `boards/r528/drivers/gt9271_iic_touch.c` | **GT9271 I2C 触摸驱动**（地址选择时序、零长度写、返回值判据、坐标 mask/burst/maxpoint/circbuf） |
-| 6 | `boards/r528/drivers/gt9271_iic_touch.h` | GT9271 触摸驱动头文件 |
-| 7 | `chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.c` | **BOE 1200×1920 MIPI DSI 面板驱动**（由安卓 DTB 逆向翻译的 init 序列/时序） |
-| 8 | `chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.h` | BOE 面板驱动头文件 |
-| 9 | `chips/r528/drivers/rtos-hal/hal/source/disp2/soc/BOE_1200x1920_mipi_config.c` | BOE 面板 MIPI 配置（`g_lcd0_config` 等 SoC 级参数） |
+| 1 | `apps/gt9271_touch_test/Kconfig` | GT9271 触摸自检 APP 的 Kconfig 开关（历史保留） |
+| 2 | `apps/gt9271_touch_test/Make.defs` | 触摸自检 APP 构建定义（历史保留） |
+| 3 | `apps/gt9271_touch_test/Makefile` | 触摸自检 APP 构建入口（历史保留） |
+| 4 | `apps/gt9271_touch_test/gt9271_touch_test_main.c` | 触摸自检 APP 主程序（历史保留） |
+| 5 | `boards/r528/drivers/gt9271_iic_touch.c` | GT9271 I2C 触摸驱动（历史保留，新屏已改用 HX83102） |
+| 6 | `boards/r528/drivers/gt9271_iic_touch.h` | GT9271 驱动头文件 |
+| 7 | `chips/r528/.../disp2/disp/lcd/BOE_1200x1920.c` | 旧 1200×1920 面板驱动（历史保留，当前不编译） |
+| 8 | `chips/r528/.../disp2/disp/lcd/BOE_1200x1920.h` | 旧面板头文件 |
+| 9 | `chips/r528/.../disp2/soc/BOE_1200x1920_mipi_config.c` | 旧面板 MIPI 配置 |
+| 10 | `boards/r528/drivers/hx83102_iic_touch.c` | **HX83102 I2C 触摸驱动**（零 Flash、0F 固件下载、单点上报） |
+| 11 | `boards/r528/drivers/hx83102_iic_touch.h` | HX83102 驱动头文件（I2C 0x48、PB4/PB5、坐标旋转） |
+| 12 | `boards/r528/drivers/hx83102_firmware.c` | 128 KB HX83102 固件 C 数组 |
+| 13 | `boards/r528/drivers/gen_hx83102_fw.sh` | `Himax_firmware.bin` → C 数组生成脚本 |
+| 14 | `boards/r528/drivers/hx83102_port.md` | 移植记录与硬件待确认项 |
+| 15 | `chips/r528/.../disp2/disp/lcd/BOE_1440x720.c` | **BOE 1440×720 面板驱动**（DTS init/exit 序列） |
+| 16 | `chips/r528/.../disp2/disp/lcd/BOE_1440x720.h` | 新面板头文件 |
+| 17 | `chips/r528/.../disp2/disp/lcd/BOE_1440x720_port.md` | 新面板移植记录（RK3588 DTS → R528） |
+| 18 | `chips/r528/.../disp2/soc/BOE_1440x720_mipi_config.c` | 新面板 MIPI 配置（4-lane、RGB888、degree0=3） |
 
-> 其中 `apps/gt9271_touch_test` 为**整目录**，manifest 用一条目录 linkfile 映射。
+> `apps/gt9271_touch_test` 为整目录，manifest 用一条目录 linkfile 映射。
+> `deskmate/defconfig` 由根 manifest 的 `r528/deskmate` 目录映射，不在本目录。
 
-## 二、改动 17 文件（copyfile 覆盖上游）
+## 二、改动 18 文件（copyfile 覆盖上游）
 
 | # | 路径（相对本目录） | 作用 |
 |---|---|---|
-| 1 | `boards/r528/drivers/Kconfig` | 板级驱动注册：GT9271 触摸开关 |
-| 2 | `boards/r528/r528s3-gemini-s1/src/Makefile` | 板级构建注册：触摸源文件纳入编译 |
-| 3 | `boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_conf.c` | Realtek WiFi 配置：**冷启动重试** |
-| 4 | `boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_util.c` | Realtek WiFi 工具：**冷启动重试** |
-| 5 | `boards/r528/drivers/realtek_ieee80211/os/customer_rtos/customer_rtos_service.c` | Realtek WiFi 服务层：**冷启动重试** |
-| 6 | `chips/r528/r528_boot.c` | 启动初始化适配（引脚/时钟等） |
-| 7 | `chips/r528/drivers/rtos-hal/hal/source/disp2/Make.defs` | 显示模块构建开关：BOE 面板纳入编译（修 T070 无条件编译致 `g_lcd0_config` 符号冲突） |
-| 8 | `chips/r528/drivers/rtos-hal/hal/source/disp2/disp/Makefile` | disp 子模块构建注册 |
-| 9 | `chips/r528/drivers/rtos-hal/hal/source/disp2/disp/de/lowlevel_v2x/de_dsi.c` | **DSI 链路加固**：`dsi_gen_wr()` 加超时，根治卡 LOGO 死等 |
-| 10 | `chips/r528/drivers/rtos-hal/hal/source/disp2/disp/dev_fb.c` | framebuffer 驱动适配（横屏驱动层旋转/分辨率） |
-| 11 | `chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/Kconfig` | LCD 面板 Kconfig：BOE 面板开关 |
-| 12 | `chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/panels.c` | 面板注册表：挂载 BOE 面板 |
-| 13 | `chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/panels.h` | 面板声明 |
-| 14 | `chips/r528/drivers/rtos-hal/hal/source/disp2/soc/Kconfig` | SoC 级 Kconfig：BOE MIPI config 开关 |
-| 15 | `chips/r528/drivers/rtos-hal/hal/source/disp2/soc/Makefile` | SoC 级构建注册：BOE MIPI config 纳入编译 |
-| 16 | `chips/r528/drivers/rtos-hal/hal/source/sensor/als/ltr553.c` | **LTR553 ALS 环境光驱动**（积分时间 × 增益校正） |
-| 17 | `chips/r528/drivers/rtos-hal/hal/source/sound/codecs/sun8iw20-codec.c` | **sun8iw20-codec**：麦克风关断 POP |
+| 1 | `boards/r528/drivers/Kconfig` | 板级驱动注册：GT9271 + **HX83102** 触摸开关 |
+| 2 | `boards/r528/r528s3-gemini-s1/src/Makefile` | 板级构建注册：HX83102 源文件/固件纳入编译 |
+| 3 | `boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_conf.c` | Realtek WiFi 配置：冷启动重试 |
+| 4 | `boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_util.c` | Realtek WiFi 工具：冷启动重试 |
+| 5 | `boards/r528/drivers/realtek_ieee80211/os/customer_rtos/customer_rtos_service.c` | Realtek WiFi 服务层：冷启动重试 |
+| 6 | `chips/r528/r528_boot.c` | 启动初始化：注册 HX83102 到 `/dev/input0` |
+| 7 | `chips/r528/.../disp2/Make.defs` | 实际编译清单：BOE_1440x720 + MIPI config |
+| 8 | `chips/r528/.../disp2/disp/Makefile` | disp 子模块构建注册 |
+| 9 | `chips/r528/.../disp2/disp/de/lowlevel_v2x/de_dsi.c` | DSI 链路加固：`dsi_gen_wr()` 超时 |
+| 10 | `chips/r528/.../disp2/disp/dev_fb.c` | framebuffer 横屏旋转/分辨率适配 |
+| 11 | `chips/r528/.../disp2/disp/lcd/Kconfig` | LCD 面板 Kconfig：**新增 BOE_1440X720 条目** |
+| 12 | `chips/r528/.../disp2/disp/lcd/panels.c` | 面板注册表：挂载 BOE_1440x720 |
+| 13 | `chips/r528/.../disp2/disp/lcd/panels.h` | 面板声明 |
+| 14 | `chips/r528/.../disp2/soc/Kconfig` | SoC 级 Kconfig：BOE_1440X720_MIPI 开关 |
+| 15 | `chips/r528/.../disp2/soc/Makefile` | SoC 级构建注册：新 MIPI config 纳入编译 |
+| 16 | `chips/r528/.../sensor/als/ltr553.c` | LTR553 ALS 环境光驱动 |
+| 17 | `chips/r528/.../sound/codecs/sun8iw20-codec.c` | sun8iw20-codec：麦克风关断 POP |
+| 18 | `boards/r528/r528s3-gemini-s1/configs/bootloader/defconfig` | bootloader 面板切 BOE_1440X720；修 uORB/signals 构建缺陷 |
 
 ## 三、使用与注意事项
 

@@ -33,6 +33,7 @@
 
 #include <nuttx/config.h>
 #include <stdio.h>
+#include <pthread.h>
 
 #include <lvgl/lvgl.h>
 #include "dm_pet.h"
@@ -44,7 +45,7 @@
  ****************************************************************************/
 #define PET_BEHAVIOR_TICK_MS    500   /* 行为选择节拍（core durations 以此为单位） */
 #define PET_TIME_TICK_MS        (60 * 1000)  /* 属性时间推进：每分钟一次 */
-#define PET_ANIM_TICK_MS        120   /* 动画节拍（view 内部再分频到 ~2.8fps） */
+#define PET_ANIM_TICK_MS        33    /* poll authored 80ms+ frames without fixed frame windows */
 #define PET_POLL_TICK_MS        100   /* 事件队列消费（10Hz，主线程） */
 #define PET_SAVE_INTERVAL_S     60
 
@@ -60,6 +61,7 @@ static pet_evt_entry_t g_evt_queue[EVT_QUEUE_SIZE];
 static volatile int g_evt_head = 0;
 static volatile int g_evt_tail = 0;
 static unsigned g_evt_dropped = 0;
+static pthread_mutex_t g_evt_lock=PTHREAD_MUTEX_INITIALIZER;
 
 /****************************************************************************
  * Timer 句柄（拥有者：本门面）
@@ -77,10 +79,13 @@ static lv_timer_t *g_time_timer;             /* 属性时间推进 timer */
 static void pet_poll_cb(lv_timer_t *t)
 {
     (void)t;
-    while (g_evt_tail != g_evt_head)
+    for (;;)
         {
+            pthread_mutex_lock(&g_evt_lock);
+            if (g_evt_tail==g_evt_head) { pthread_mutex_unlock(&g_evt_lock);break; }
             pet_evt_entry_t e = g_evt_queue[g_evt_tail];
             g_evt_tail = (g_evt_tail + 1) & EVT_QUEUE_MASK;
+            pthread_mutex_unlock(&g_evt_lock);
             pet_core_process_event(e.evt, e.param);
         }
 }
@@ -115,17 +120,15 @@ static void timers_pause(bool pause)
 {
     if (pause)
         {
-            /* 进主屏：宠物不可见，停动画/行为/属性推进省 CPU；
-             * poll 照常（事件照常消费），save 照常（定时落盘不断） */
+            /* 进主屏只停可见动画/行为；属性、poll、save 继续，
+             * 避免打开应用后养成时间停止。 */
             if (g_anim_timer)     lv_timer_pause(g_anim_timer);
             if (g_behavior_timer) lv_timer_pause(g_behavior_timer);
-            if (g_time_timer)     lv_timer_pause(g_time_timer);
         }
     else
         {
             if (g_anim_timer)     lv_timer_resume(g_anim_timer);
             if (g_behavior_timer) lv_timer_resume(g_behavior_timer);
-            if (g_time_timer)     lv_timer_resume(g_time_timer);
         }
 }
 
@@ -180,6 +183,19 @@ void dm_pet_on_event(dm_pet_event_t evt)
     dm_pet_on_event_param(evt, 0);
 }
 
+void dm_pet_on_tap(dm_pet_touch_zone_t area)
+{
+    dm_pet_on_input(area == PET_TOUCH_HEAD ? PET_EVT_TAP_HEAD : PET_EVT_TAP_BODY, 0);
+}
+
+void dm_pet_on_input(dm_pet_event_t evt, int param)
+{
+    uint32_t before = pet_core_animation_id();
+    dm_pet_on_event_param(evt, param);
+    pet_poll_cb(NULL);
+    if (before != pet_core_animation_id()) pet_view_refresh_sprite();
+}
+
 void dm_pet_on_event_param(dm_pet_event_t evt, int param)
 {
     if (evt <= PET_EVT_NONE || evt >= PET_EVT_COUNT) return;
@@ -188,6 +204,7 @@ void dm_pet_on_event_param(dm_pet_event_t evt, int param)
      * core 不再收这两个事件（纯引擎语义，无视之）。 */
     if (evt == PET_EVT_WAKE_UP)
         {
+            pet_view_suspend();
             timers_pause(true);
             return;
         }
@@ -198,6 +215,7 @@ void dm_pet_on_event_param(dm_pet_event_t evt, int param)
             return;
         }
 
+    pthread_mutex_lock(&g_evt_lock);
     int next = (g_evt_head + 1) & EVT_QUEUE_MASK;
     if (next == g_evt_tail)
         {
@@ -205,11 +223,13 @@ void dm_pet_on_event_param(dm_pet_event_t evt, int param)
              * 正常 UW 下 64 深 Venus 绰绰有余；持续增长即上游风暴，加日志定位 */
             if ((++g_evt_dropped % 16) == 1)
                 LV_LOG_USER("[pet] evt queue full, dropped=%u evt=%d", g_evt_dropped, (int)evt);
+            pthread_mutex_unlock(&g_evt_lock);
             return;
         }
     g_evt_queue[g_evt_head].evt = evt;
     g_evt_queue[g_evt_head].param = param;
     g_evt_head = next;
+    pthread_mutex_unlock(&g_evt_lock);
 }
 
 /* 拆 UI + 停 timer（deinit/关总开关共用；队列保留，事件照进） */
@@ -295,4 +315,51 @@ void dm_pet_set_roam_rect(const dm_pet_roam_t *rect)
 void dm_pet_clear_roam_rect(void)
 {
     pet_view_clear_roam();
+}
+
+/* 2026-11-01 P331：语音命令门面。调用方是 LVGL 线程（cmd 轮询 timer），
+ * 所以直接调 core/view，不再过事件队列，保证"说完立刻动"。 */
+extern void pet_core_command(int cmd, int seconds);
+extern void pet_core_hold_clear(void);
+
+void dm_pet_command(dm_pet_cmd_t cmd, int seconds)
+{
+    switch (cmd)
+    {
+    case DM_PET_CMD_WALK:
+        pet_core_hold_clear();          /* 先解除"坐/睡"保持 */
+        pet_view_stroll_start(seconds);
+        break;
+
+    case DM_PET_CMD_SIT:
+        pet_view_stroll_stop();
+        pet_core_command(1, 0);
+        break;
+
+    case DM_PET_CMD_SLEEP:
+        pet_view_stroll_stop();
+        pet_core_command(2, 0);
+        break;
+
+    case DM_PET_CMD_EAT:
+        pet_view_stroll_stop();
+        pet_core_hold_clear();
+        /* 复用既有投喂链路：加饱食度 + EAT 动作 + 快乐值 */
+        dm_pet_on_event_param(PET_EVT_VOICE_CMD, (int)PET_EVT_FEED_FISH);
+        break;
+
+    case DM_PET_CMD_GROOM:
+        /* P344：舔爪是本来就有的 groom_paw 动作（PET_PLAY_ONCE，2.06s），
+         * 只请求动作、不改状态机，播完自然回到原来的行为。 */
+        pet_view_stroll_stop();
+        pet_core_hold_clear();
+        pet_core_command(4, 0);
+        break;
+
+    case DM_PET_CMD_STOP:
+    default:
+        pet_view_stroll_stop();
+        pet_core_command(3, 0);
+        break;
+    }
 }

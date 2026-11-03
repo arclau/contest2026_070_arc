@@ -1,0 +1,2 @@
+25080fdb4a4d549dbecadd9bdb4ef9dd4533e66e0d372973640ec146b1203d90  cmake_out/vela_goldfish-arm64-v8a-ap/nuttx
+99e2667f6b254e5f639e3008cdeda66b2e8b9d6b08d9fbde9a718bc43388244e  cmake_out/vela_goldfish-arm64-v8a-ap/.config

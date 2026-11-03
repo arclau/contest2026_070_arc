@@ -116,6 +116,11 @@ lv_obj_t *dm_popup_btn(lv_obj_t *parent, const char *txt, int kind, lv_event_cb_
 void dm_popup_fit(lv_obj_t *card, lv_obj_t *btnrow); /* 自适应补高：实测按钮行溢出则撑足卡片（show后调） */
 void dm_utf8_trim(char *s);   /* 2026-09-14：截断尾部不完整 UTF-8 序列（中文文件名） */
 
+/* UI-thread local control API: app/music/volume/brightness/pet/scene/health/alarm.
+ * No ASR, LLM or cloud TTS. Returns 1 for a recognized prefix, 0 otherwise.
+ * Arguments use the existing internal command grammar; not an untrusted RPC. */
+int dm_local_cmd_dispatch(const char *cmd);
+
 /* 本地提示音（2026-08-16 P102）：播 /resource/tones/<name>.wav
  * 后台线程直读 WAV → snd_vela_pcm，不经过 XPlayer（避免与音乐状态机纠缠）；
  * 声卡被音乐占用时 open 失败 → 跳过提示音（不打断音乐）。 */
@@ -268,7 +273,10 @@ extern lv_obj_t     *w_cur_temp_lbl;
 extern lv_obj_t     *w_cur_desc_lbl;
 extern lv_obj_t     *w_day_lbl[DM_WEATHER_DAYS];
 extern lv_obj_t     *w_icon_cv[DM_WEATHER_DAYS];
-extern uint32_t      w_icon_buf[DM_WEATHER_DAYS][64 * 64];
+/* P360：天气图标画布边长（像素）。ui_home.c 的绘制与缓冲区共用此宏，
+ * 改一处即可，避免两处尺寸不一致导致越界。 */
+#define DM_WICON_SIZE 96
+extern uint32_t      w_icon_buf[DM_WEATHER_DAYS][DM_WICON_SIZE * DM_WICON_SIZE];
 extern lv_obj_t     *w_temp_lbl[DM_WEATHER_DAYS];
 
 /* 待机/锁屏状态（ui_home.c 定义，ui_home.c 内部 static 使用） */

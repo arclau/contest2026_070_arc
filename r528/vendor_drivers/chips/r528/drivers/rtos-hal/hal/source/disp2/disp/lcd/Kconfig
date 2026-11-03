@@ -228,6 +228,18 @@ config LCD_SUPPORT_BOE_1200X1920
     default n
     ---help---
       If you want to Support  BOE_1200x1920 mipi 1200x1920 panel for display driver, select it.
+config LCD_SUPPORT_BOE_1440X720
+    bool "LCD support BOE 1440x720 panel"
+	select FB_UPDATE
+    default n
+    ---help---
+      If you want to Support BOE_1440x720 mipi 720x1440 (landscape 1440x720) panel for display driver, select it.
+config LCD_SUPPORT_TIANMA_1080X2160
+    bool "LCD support TIANMA 1080x2160 panel"
+	select FB_UPDATE
+    default n
+    ---help---
+      If you want to Support TIANMA_1080x2160 mipi 1080x2160 panel for display driver, select it.
 config LCD_SUPPORT_SSD1306
     bool "LCD support SSD1306 panel"
     default n

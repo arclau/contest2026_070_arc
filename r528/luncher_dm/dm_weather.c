@@ -38,9 +38,8 @@
 #include "dm_city.h"      /* 2026-09-10 A 方案：坐标按 Settings 城市运行时取 */
 #include "dm_health_cfg.h"  /* 2026-09-10 P211：自动对时总闸持久化 */
 
-/* 默认坐标（惠州，dm_city 表 idx0 同值；cfg 缺失时 dm_city 兜底用） */
-#define DM_W_LAT      "23.11"
-#define DM_W_LON      "114.42"
+/* 坐标只在 dm_city 表里维护一份（默认城市见 DM_CITY_DEFAULT_IDX），
+ * 这里不再留第二份写死的经纬度，避免换城市时两处不同步。 */
 /* 2026-09-10 P206 板上实锤：Asia%2FShanghai 被 open-meteo 拒
  * （body={"error":true,"reason":"Invalid timezone"}，见 910bootlog），
  * 编码斜杠过代理会被拒；改直写斜杠后天气链路可用。失败时直接返回 -1，
@@ -54,7 +53,7 @@
 #endif
 
 /* 2026-09-10：URL 改运行时拼接（城市切换即换坐标；旧 DM_W_PATH
- * 编译期写死惠州已删）。 */
+ * 编译期写死城市已删）。 */
 static void dm_w_build_path(char *out, size_t cap)
 {
     const dm_city_t *c = dm_city_cur();
@@ -151,6 +150,13 @@ static void dbg_set(const char *fmt, ...)
     va_start(ap, fmt);
     vsnprintf(g_dbg, sizeof(g_dbg), fmt, ap);
     va_end(ap);
+}
+
+static long elapsed_ms(const struct timespec *start,
+                       const struct timespec *end)
+{
+    return (long)(end->tv_sec - start->tv_sec) * 1000L +
+           (end->tv_nsec - start->tv_nsec) / 1000000L;
 }
 
 /* P133（2026-08-28）：天气落盘 /data/dm_weather.state 共享给 ai_agent——
@@ -447,7 +453,7 @@ int dm_weather_fetch(dm_weather_t *w)
     int tmax[DM_WEATHER_DAYS]   = {0};
     int tmin[DM_WEATHER_DAYS]   = {0};
     int n, i;
-    struct timeval t0, t1;
+    struct timespec t0, t1;
     time_t server_time = 0;
 
     if (w == NULL)
@@ -456,7 +462,7 @@ int dm_weather_fetch(dm_weather_t *w)
     memset(w, 0, sizeof(*w));
 
     /* 2026-08-11：记录耗时供 debug 显示 */
-    gettimeofday(&t0, NULL);
+    clock_gettime(CLOCK_MONOTONIC, &t0);
 
     /* 2026-09-10：按当前城市拼 URL（旧 DM_W_PATH 编译期写死已删） */
     {
@@ -464,7 +470,7 @@ int dm_weather_fetch(dm_weather_t *w)
         dm_w_build_path(path, sizeof(path));
         if (http_get(path, buf, sizeof(buf), &server_time) < 0)
         {
-            gettimeofday(&t1, NULL);
+            clock_gettime(CLOCK_MONOTONIC, &t1);
             /* 2026-08-10 修复：g_dbg 既是 vsnprintf 目标又是 %s 源，
              * 重叠导致 "FAIL xms: FAIL xms: " 双重嵌套、真实原因被覆盖。
              * 先拷到局部缓冲再格式化。 */
@@ -472,8 +478,7 @@ int dm_weather_fetch(dm_weather_t *w)
             strncpy(reason, g_dbg, sizeof(reason) - 1);
             reason[sizeof(reason) - 1] = '\0';
             dbg_set("FAIL %ldms: %s",
-                    (long)((t1.tv_sec - t0.tv_sec) * 1000 +
-                           (t1.tv_usec - t0.tv_usec) / 1000),
+                    elapsed_ms(&t0, &t1),
                     reason);   /* http_get 写的具体失败原因 */
             return -1;   /* 2026-08-10：失败返回 -1，UI 据此缩短重试周期 */
         }
@@ -515,10 +520,9 @@ int dm_weather_fetch(dm_weather_t *w)
             n = json_str_array(dl, "\"time\"", dates, DM_WEATHER_DAYS);
             if (n == 0)
                 {
-                    gettimeofday(&t1, NULL);
+                    clock_gettime(CLOCK_MONOTONIC, &t1);
                     dbg_set("FAIL %ldms: parse (no time[] in JSON)",
-                            (long)((t1.tv_sec - t0.tv_sec) * 1000 +
-                                   (t1.tv_usec - t0.tv_usec) / 1000));
+                            elapsed_ms(&t0, &t1));
                     return -1;   /* 2026-08-10：解析失败同样返回 -1 触发快速重试 */
                 }
 
@@ -528,7 +532,7 @@ int dm_weather_fetch(dm_weather_t *w)
         }
     else
         {
-            gettimeofday(&t1, NULL);
+            clock_gettime(CLOCK_MONOTONIC, &t1);
             /* 2026-09-10 P206：parse 失败带 body 前 64B（2026-09-10 板上
              * 连续"no daily in JSON"，光看原因猜不出是 API 变了还是包被截断） */
             {
@@ -536,8 +540,7 @@ int dm_weather_fetch(dm_weather_t *w)
                 strncpy(head, buf, 64);
                 head[64] = '\0';
                 dbg_set("FAIL %ldms: parse (no daily in JSON) body=%.64s",
-                        (long)((t1.tv_sec - t0.tv_sec) * 1000 +
-                               (t1.tv_usec - t0.tv_usec) / 1000),
+                        elapsed_ms(&t0, &t1),
                         head);
             }
             return -1;
@@ -554,10 +557,9 @@ int dm_weather_fetch(dm_weather_t *w)
             w->days[i].wday  = weekday_from_date(dates[i]);
         }
 
-    gettimeofday(&t1, NULL);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
     dbg_set("OK %ldms: %s, %d days, %dC/%d%%",
-            (long)((t1.tv_sec - t0.tv_sec) * 1000 +
-                   (t1.tv_usec - t0.tv_usec) / 1000),
+            elapsed_ms(&t0, &t1),
             dm_city_cur()->name, w->n_days, w->cur_temp, w->cur_humid);
     weather_state_save(w);   /* P133：落盘共享给 ai_agent 读 */
     return 0;

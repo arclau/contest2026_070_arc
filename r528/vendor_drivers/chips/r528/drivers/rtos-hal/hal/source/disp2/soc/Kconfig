@@ -52,6 +52,17 @@ config BOE_1200X1920_MIPI
 	default n
 	---help---
 	  board, disp with BOE MIPI 1200x1920 panel
+config BOE_1440X720_MIPI
+	bool "board, disp with BOE 1440x720 MIPI"
+	default n
+	---help---
+	  board, disp with BOE MIPI 720x1440 (landscape 1440x720) panel
+
+config TIANMA_1080X2160_MIPI
+	bool "board, disp with TIANMA 1080x2160 MIPI"
+	default n
+	---help---
+	  board, disp with TIANMA MIPI 1080x2160 panel
 
 config SSD1306_SPI
 	bool "board, disp with SSD1306 SPI"

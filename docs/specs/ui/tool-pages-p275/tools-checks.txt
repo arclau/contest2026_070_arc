@@ -1,0 +1,7 @@
+PASS unavailable retains command; reconnect; keyboard does not cover input/send/log
+PASS partial writes send command and CRLF exactly once
+PASS EAGAIN retry preserves write offset
+PASS permanent error and timeout retain input and report failure
+PASS baud rollback, bounded RX, HEX output and oversized text retention
+PASS close/reopen releases timer and lazy keyboard
+PASS all settings categories, repeated selection reuses tree, close/reopen

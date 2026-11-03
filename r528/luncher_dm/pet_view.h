@@ -21,7 +21,7 @@ void pet_view_destroy(void);
 bool pet_view_reuse(void);
 
 /* 节拍（门面 timer 驱动，主线程） */
-void pet_view_anim_tick(void);    /* 120ms：帧推进 + 位移 + 呼吸 */
+void pet_view_anim_tick(void);    /* authored frame durations + walk displacement */
 void pet_view_bubble_tick(void);  /* 500ms：气泡隐藏倒计时 */
 
 /* 气泡（与 ops 注册的是同一实现；门面用于长离线欢迎） */
@@ -29,9 +29,17 @@ void pet_view_show_bubble(const char *txt, int ticks);
 
 /* 类型切换后刷新当前帧（门面调） */
 void pet_view_refresh_sprite(void);
+void pet_view_suspend(void);     /* release held gestures, freeze playback clock */
 
 /* 漫游区覆盖（屏幕坐标；NULL/调 clear 恢复默认启发式） */
 void pet_view_set_roam(int x1, int y1, int x2, int y2);
 void pet_view_clear_roam(void);
+
+/* 2026-11-01 P331：散步模式（语音"走五分钟"）。
+ * 期间猫在整屏随机选点 2D 走，每段之间坐 4~8 秒；到点自动走回漫游区。
+ * seconds<=0 用默认 300s，上限 3600s。 */
+void pet_view_stroll_start(int seconds);
+void pet_view_stroll_stop(void);
+bool pet_view_stroll_active(void);
 
 #endif /* __APPS_VENDOR_ALLWINNERTECH_APPS_LUNCHER_DM_PET_VIEW_H */

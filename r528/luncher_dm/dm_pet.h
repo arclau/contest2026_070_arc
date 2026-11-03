@@ -43,9 +43,7 @@ typedef enum
 
 /****************************************************************************
  * 宠物状态（行为系统的顶层分类）
- * 注意：状态集合与精灵素材严格 1:1 对齐（参见 PET_SPRITE_SPEC.md）——
- *   cat_sprites 共 12 组：11 个行为态 + 1 个独立 WALK 组，无 SLEEPY 素材，
- *   精力不足时直接进 SLEEP。每组原生 12 帧。
+ * 业务状态保持兼容；可见动作独立定义于 pet_actions.h，帧数与时长不绑定状态。
  ****************************************************************************/
 typedef enum
 {
@@ -95,10 +93,18 @@ typedef enum
     PET_EVT_WATER_GOAL,     /* 今日喝水达标 → 庆祝 */
     PET_EVT_SIT_ALERT,      /* 久坐提醒 → 担忧 */
     PET_EVT_AI_CHAT,        /* AI 对话进行中 → 开心 */
+    PET_EVT_TOUCH_RELEASE,  /* 持续抚摸松手/取消，不重复计分 */
+    PET_EVT_VOICE_PHASE,    /* 实际语音阶段：0结束/1录音/2等待/3播放 */
+    PET_EVT_PET_RELAX,      /* 持续摸头后的放松反馈 */
+    PET_EVT_PLAY_BEGIN,     /* 进入手指逗猫 */
+    PET_EVT_PLAY_PHASE,     /* param: dm_pet_play_phase_t */
+    PET_EVT_PLAY_END,       /* param=1: 玩累了 */
     PET_EVT_COUNT
     /* P202 删除：健康联动 5 事件（WATER_DRANK/STOOD_UP/SIT_REMIND/
      * WATER_GOAL/HEALTH_GOAL）——2026-09-11 P1 以 4 个精简事件回归 */
 } dm_pet_event_t;
+
+typedef enum { PET_PLAY_LOOK, PET_PLAY_CHASE, PET_PLAY_POUNCE } dm_pet_play_phase_t;
 
 /****************************************************************************
  * 食物定义
@@ -117,11 +123,11 @@ typedef enum
  ****************************************************************************/
 typedef struct
 {
-    int   hunger;           /* 0~100，低→没精神/看向食物/撒娇 */
+    int   hunger;           /* 0~100，越高越饿 */
     int   energy;           /* 0~100，低→打哈欠/动作慢/找地方睡 */
     int   happiness;        /* 0~100，低→动作减少/表情低落；高→主动跑跳 */
     int   affection;        /* 0~100，只增不减，代表羁绊值 */
-    int   health;           /* 0~100，间接属性（hunger<20时衰减） */
+    int   health;           /* 0~100，间接属性（hunger>80时衰减） */
     int   growth;           /* 0→∞，累计互动次数，驱动生命周期 */
 } dm_pet_attrs_t;
 
@@ -168,7 +174,7 @@ typedef enum
  ****************************************************************************/
 
 /* 创建宠物（挂到 parent 容器上，锁屏时可见）。
- * 首次运行用默认属性 + 名字“旺财” + 猫。
+ * 首次运行用默认属性 + 名字“维拉” + 猫。
  * 后续运行从 /data/pet_state.json 恢复。
  * 幂等：重复调用只重停靠/置顶，不重复建 timer。
  * 返回 0=成功/-1=失败。 */
@@ -180,6 +186,11 @@ void dm_pet_on_event(dm_pet_event_t evt);
 
 /* 带参数的事件处理（天气类型、语音命令等） */
 void dm_pet_on_event_param(dm_pet_event_t evt, int param);
+
+/* LVGL 主线程短按入口：按队列顺序消费并立即呈现反馈。 */
+void dm_pet_on_tap(dm_pet_touch_zone_t area);
+/* LVGL 输入线程：保序消费，只有动作实例变化时才刷新首帧。 */
+void dm_pet_on_input(dm_pet_event_t evt, int param);
 
 /* 销毁宠物 UI + 保存状态 */
 void dm_pet_deinit(void);
@@ -213,13 +224,22 @@ typedef struct { int x1, y1, x2, y2; } dm_pet_roam_t;
 void dm_pet_set_roam_rect(const dm_pet_roam_t *rect);
 void dm_pet_clear_roam_rect(void);
 
-/* 宠物帧集（每状态动画帧，pet_frame_table.c 定义；原生 12 帧，与 cat_sprites 1:1） */
-#define PET_FRAMES_PER_STATE 12
-typedef struct { const lv_image_dsc_t *frames[PET_FRAMES_PER_STATE]; } pet_frame_set_t;
+/****************************************************************************
+ * 语音命令（2026-11-01 P331）
+ *
+ * 走本地短路：ASR 文本 → agent 广播 "pet:<cmd>" → UI 直接执行，不经过 LLM。
+ * 必须在 LVGL 线程调用（cmd 轮询 timer 内）。
+ ****************************************************************************/
+typedef enum
+{
+    DM_PET_CMD_WALK = 0,    /* 散步：seconds 秒后自己走回右下角 */
+    DM_PET_CMD_SIT,         /* 坐下并保持（不再自己走开） */
+    DM_PET_CMD_SLEEP,       /* 睡觉并保持 */
+    DM_PET_CMD_EAT,         /* 吃饭（复用投喂链路） */
+    DM_PET_CMD_GROOM,       /* 舔爪（复用 groom_paw 动作，一次性播完） */
+    DM_PET_CMD_STOP         /* 停下/回来：取消散步与保持，回到漫游区 */
+} dm_pet_cmd_t;
 
-/* 走路/移动帧组（12帧独立动画，与状态帧组分开；pet_frame_table.c 定义） */
-#define PET_WALK_FRAMES 12
-typedef struct { const lv_image_dsc_t *frames[PET_WALK_FRAMES]; } pet_walk_set_t;
-extern const pet_walk_set_t g_cat_walk_frames;
+void dm_pet_command(dm_pet_cmd_t cmd, int seconds);
 
 #endif /* __APPS_VENDOR_ALLWINNERTECH_APPS_LUNCHER_DM_DM_PET_H */

@@ -372,6 +372,9 @@ static void music_playlist_toggle(void)
 
 void ui_music_create(lv_obj_t *parent)
 {
+    lv_coord_t sw = lv_disp_get_hor_res(lv_disp_get_default());
+    lv_coord_t sh = lv_disp_get_ver_res(lv_disp_get_default());
+
     /* Column layout, vertically centered — no top bar, cover centers */
     lv_obj_set_flex_flow(parent, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(parent, LV_FLEX_ALIGN_CENTER,
@@ -489,6 +492,8 @@ void ui_music_create(lv_obj_t *parent)
 
     lv_obj_t *next_btn = music_round_btn(ctrl_row, DM(40), LV_SYMBOL_NEXT,
                                          music_next_cb, NULL);
+    (void)prev_btn;   /* 按钮已挂到布局，句柄后续不用 */
+    (void)next_btn;
 
     /* ── 右侧音量列（2026-08-07 用户需求）：竖向排列 上=+ 下=−，
      * 中间实时显示 0-100 数值。挂在 subpage_overlay 上与 menu_btn 同

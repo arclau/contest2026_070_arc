@@ -234,6 +234,12 @@ int sunxifb_updatearea(struct fb_vtable_s *vtable, FAR const struct fb_area_s *a
 	}
 	clock_gettime(CLOCK_MONOTONIC, &t1);
 
+	/* P280：原生竖屏（disp_rotation_used=0）时 fb_g2d_rot_create()
+	 * 返回 NULL，up_fbinitialize() 已把显示层直接指向 g_planeinfo.fbmem。
+	 * 无旋转就没有 G2D 重配置可做，脏区 cache 清理后直接返回。 */
+	if (!fb_rot)
+		return 0;
+
 	{
 	unsigned int *addr = (unsigned int *)0x05103010;
 	struct disp_layer_config config;
@@ -440,6 +446,28 @@ int up_fbinitialize(int display)
 	g_planeinfo.display = 0;
 	g_planeinfo.stride = g_videoinfo.xres * g_planeinfo.bpp / 8;
 	g_planeinfo.fblen = g_videoinfo.xres * g_videoinfo.yres * g_planeinfo.bpp / 8 * FB_NUM;
+
+#ifdef CONFIG_ARCH_BOARD_YNM3000
+  /* Validate the fixed arena before clearing it or starting G2D.  Rotation
+   * keeps two scanout frames after the render framebuffer (fb_g2d_rot.c).
+   */
+
+  size_t required = g_planeinfo.fblen;
+#ifdef CONFIG_SUNXI_DISP2_FB_HW_ROTATION_SUPPORT
+  required += (size_t)g_planeinfo.stride * g_videoinfo.yres * 2;
+#endif
+  if (required > R528_DISP_RESERVED)
+    {
+      lcderr("ERROR: framebuffer needs %lu bytes, reserved %lu\n",
+             (unsigned long)required, (unsigned long)R528_DISP_RESERVED);
+      return -ENOMEM;
+    }
+
+  printf("[fb] memory: heap_end=0x%08lx fb=0x%08lx bytes=%lu/%lu\n",
+         (unsigned long)CONFIG_RAM_END,
+         (unsigned long)R528_DISP_DDR_MAPVADDR,
+         (unsigned long)required, (unsigned long)R528_DISP_RESERVED);
+#endif
 
 	/* Ensure 64-byte alignment for LVGL */
 	uintptr_t map_vaddr = (uintptr_t)R528_DISP_DDR_MAPVADDR;

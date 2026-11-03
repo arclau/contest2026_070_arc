@@ -1,0 +1,1365 @@
+{
+  "schema_version": 1,
+  "frame_slots": 148,
+  "unique_pngs": 82,
+  "actions": [
+    {
+      "id": "idle_sit",
+      "label": "待机",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 1200
+        },
+        {
+          "asset": 80,
+          "duration_ms": 1600
+        },
+        {
+          "asset": 81,
+          "duration_ms": 1200
+        }
+      ],
+      "playback": "loop",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 0,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-a/idle_sit/clip-complete-v1.json",
+      "derivation": {
+        "base_asset": 0,
+        "strip_y": [
+          170,
+          285
+        ],
+        "feather_px": 10,
+        "offsets_px": [
+          -3,
+          3
+        ],
+        "preserve_alpha": true
+      }
+    },
+    {
+      "id": "blink",
+      "label": "眨眼",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 100
+        },
+        {
+          "asset": 3,
+          "duration_ms": 80
+        },
+        {
+          "asset": 4,
+          "duration_ms": 80
+        },
+        {
+          "asset": 0,
+          "duration_ms": 140
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 1,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-a/blink/clip.json"
+    },
+    {
+      "id": "notice_user",
+      "label": "看过来",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 80
+        },
+        {
+          "asset": 5,
+          "duration_ms": 100
+        },
+        {
+          "asset": 6,
+          "duration_ms": 120
+        },
+        {
+          "asset": 7,
+          "duration_ms": 500
+        },
+        {
+          "asset": 6,
+          "duration_ms": 140
+        },
+        {
+          "asset": 5,
+          "duration_ms": 120
+        },
+        {
+          "asset": 8,
+          "duration_ms": 100
+        },
+        {
+          "asset": 0,
+          "duration_ms": 140
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 2,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-a/notice_user/clip-complete-v1.json"
+    },
+    {
+      "id": "pet_nuzzle",
+      "label": "贴贴",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 100
+        },
+        {
+          "asset": 3,
+          "duration_ms": 100
+        },
+        {
+          "asset": 4,
+          "duration_ms": 120
+        },
+        {
+          "asset": 9,
+          "duration_ms": 160
+        },
+        {
+          "asset": 10,
+          "duration_ms": 440
+        },
+        {
+          "asset": 9,
+          "duration_ms": 160
+        },
+        {
+          "asset": 4,
+          "duration_ms": 120
+        },
+        {
+          "asset": 3,
+          "duration_ms": 100
+        },
+        {
+          "asset": 0,
+          "duration_ms": 100
+        }
+      ],
+      "playback": "while_held",
+      "hold_frame": 4,
+      "release_start_frame": 5,
+      "priority": 4,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-a/pet_nuzzle/clip.json"
+    },
+    {
+      "id": "stretch",
+      "label": "伸懒腰",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 120
+        },
+        {
+          "asset": 11,
+          "duration_ms": 150
+        },
+        {
+          "asset": 12,
+          "duration_ms": 160
+        },
+        {
+          "asset": 13,
+          "duration_ms": 180
+        },
+        {
+          "asset": 14,
+          "duration_ms": 200
+        },
+        {
+          "asset": 15,
+          "duration_ms": 500
+        },
+        {
+          "asset": 16,
+          "duration_ms": 200
+        },
+        {
+          "asset": 14,
+          "duration_ms": 180
+        },
+        {
+          "asset": 13,
+          "duration_ms": 180
+        },
+        {
+          "asset": 12,
+          "duration_ms": 160
+        },
+        {
+          "asset": 11,
+          "duration_ms": 150
+        },
+        {
+          "asset": 0,
+          "duration_ms": 180
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 3,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-a/stretch/clip-complete-v1.json"
+    },
+    {
+      "id": "sleep_enter",
+      "label": "入睡",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 180
+        },
+        {
+          "asset": 3,
+          "duration_ms": 180
+        },
+        {
+          "asset": 17,
+          "duration_ms": 200
+        },
+        {
+          "asset": 18,
+          "duration_ms": 220
+        },
+        {
+          "asset": 19,
+          "duration_ms": 220
+        },
+        {
+          "asset": 20,
+          "duration_ms": 260
+        },
+        {
+          "asset": 21,
+          "duration_ms": 240
+        },
+        {
+          "asset": 22,
+          "duration_ms": 240
+        },
+        {
+          "asset": 23,
+          "duration_ms": 200
+        },
+        {
+          "asset": 24,
+          "duration_ms": 400
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 1,
+      "start_pose": "sit",
+      "end_pose": "lie",
+      "source_clip": "batch-a/sleep_enter/clip-complete-v1.json"
+    },
+    {
+      "id": "sleep_loop",
+      "label": "睡觉",
+      "frames": [
+        {
+          "asset": 24,
+          "duration_ms": 700
+        },
+        {
+          "asset": 25,
+          "duration_ms": 450
+        },
+        {
+          "asset": 26,
+          "duration_ms": 650
+        },
+        {
+          "asset": 27,
+          "duration_ms": 100
+        },
+        {
+          "asset": 26,
+          "duration_ms": 250
+        },
+        {
+          "asset": 25,
+          "duration_ms": 450
+        }
+      ],
+      "playback": "loop",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 0,
+      "start_pose": "lie",
+      "end_pose": "lie",
+      "source_clip": "batch-a/sleep_loop/clip-complete-v1.json"
+    },
+    {
+      "id": "wake",
+      "label": "醒来",
+      "frames": [
+        {
+          "asset": 24,
+          "duration_ms": 180
+        },
+        {
+          "asset": 28,
+          "duration_ms": 300
+        },
+        {
+          "asset": 29,
+          "duration_ms": 200
+        },
+        {
+          "asset": 30,
+          "duration_ms": 220
+        },
+        {
+          "asset": 31,
+          "duration_ms": 220
+        },
+        {
+          "asset": 32,
+          "duration_ms": 220
+        },
+        {
+          "asset": 33,
+          "duration_ms": 220
+        },
+        {
+          "asset": 3,
+          "duration_ms": 80
+        },
+        {
+          "asset": 4,
+          "duration_ms": 80
+        },
+        {
+          "asset": 0,
+          "duration_ms": 240
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 4,
+      "start_pose": "lie",
+      "end_pose": "sit",
+      "source_clip": "batch-a/wake/clip-complete-v1.json"
+    },
+    {
+      "id": "eat",
+      "label": "吃饭",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 120
+        },
+        {
+          "asset": 34,
+          "duration_ms": 180
+        },
+        {
+          "asset": 35,
+          "duration_ms": 200
+        },
+        {
+          "asset": 36,
+          "duration_ms": 120
+        },
+        {
+          "asset": 37,
+          "duration_ms": 120
+        },
+        {
+          "asset": 35,
+          "duration_ms": 180
+        },
+        {
+          "asset": 36,
+          "duration_ms": 120
+        },
+        {
+          "asset": 37,
+          "duration_ms": 120
+        },
+        {
+          "asset": 38,
+          "duration_ms": 180
+        },
+        {
+          "asset": 35,
+          "duration_ms": 160
+        },
+        {
+          "asset": 34,
+          "duration_ms": 180
+        },
+        {
+          "asset": 0,
+          "duration_ms": 160
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 4,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-b/eat/clip-complete-v1.json"
+    },
+    {
+      "id": "groom_paw",
+      "label": "舔爪",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 100
+        },
+        {
+          "asset": 39,
+          "duration_ms": 140
+        },
+        {
+          "asset": 40,
+          "duration_ms": 180
+        },
+        {
+          "asset": 41,
+          "duration_ms": 250
+        },
+        {
+          "asset": 40,
+          "duration_ms": 100
+        },
+        {
+          "asset": 42,
+          "duration_ms": 150
+        },
+        {
+          "asset": 43,
+          "duration_ms": 280
+        },
+        {
+          "asset": 40,
+          "duration_ms": 120
+        },
+        {
+          "asset": 39,
+          "duration_ms": 140
+        },
+        {
+          "asset": 0,
+          "duration_ms": 180
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 1,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-b/groom_paw/clip-complete-v1.json"
+    },
+    {
+      "id": "happy",
+      "label": "开心",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 100
+        },
+        {
+          "asset": 3,
+          "duration_ms": 90
+        },
+        {
+          "asset": 4,
+          "duration_ms": 90
+        },
+        {
+          "asset": 44,
+          "duration_ms": 200
+        },
+        {
+          "asset": 45,
+          "duration_ms": 220
+        },
+        {
+          "asset": 46,
+          "duration_ms": 220
+        },
+        {
+          "asset": 44,
+          "duration_ms": 180
+        },
+        {
+          "asset": 4,
+          "duration_ms": 90
+        },
+        {
+          "asset": 3,
+          "duration_ms": 90
+        },
+        {
+          "asset": 0,
+          "duration_ms": 180
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 3,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-b/happy/clip-complete-v1.json"
+    },
+    {
+      "id": "hungry",
+      "label": "肚子饿",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 200
+        },
+        {
+          "asset": 5,
+          "duration_ms": 150
+        },
+        {
+          "asset": 47,
+          "duration_ms": 200
+        },
+        {
+          "asset": 48,
+          "duration_ms": 400
+        },
+        {
+          "asset": 49,
+          "duration_ms": 220
+        },
+        {
+          "asset": 47,
+          "duration_ms": 180
+        },
+        {
+          "asset": 5,
+          "duration_ms": 150
+        },
+        {
+          "asset": 0,
+          "duration_ms": 200
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 1,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-b/hungry/clip-complete-v1.json"
+    },
+    {
+      "id": "walk",
+      "label": "散步",
+      "frames": [
+        {
+          "asset": 50,
+          "duration_ms": 100
+        },
+        {
+          "asset": 51,
+          "duration_ms": 100
+        },
+        {
+          "asset": 52,
+          "duration_ms": 100
+        },
+        {
+          "asset": 53,
+          "duration_ms": 100
+        },
+        {
+          "asset": 54,
+          "duration_ms": 100
+        },
+        {
+          "asset": 55,
+          "duration_ms": 100
+        },
+        {
+          "asset": 56,
+          "duration_ms": 100
+        },
+        {
+          "asset": 57,
+          "duration_ms": 100
+        },
+        {
+          "asset": 58,
+          "duration_ms": 100
+        },
+        {
+          "asset": 59,
+          "duration_ms": 100
+        },
+        {
+          "asset": 60,
+          "duration_ms": 100
+        },
+        {
+          "asset": 61,
+          "duration_ms": 100
+        }
+      ],
+      "playback": "loop",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 1,
+      "start_pose": "stand",
+      "end_pose": "stand",
+      "source_clip": "batch-c/walk/clip-v4-transitions.json"
+    },
+    {
+      "id": "turn",
+      "label": "起身",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 100
+        },
+        {
+          "asset": 62,
+          "duration_ms": 140
+        },
+        {
+          "asset": 63,
+          "duration_ms": 140
+        },
+        {
+          "asset": 64,
+          "duration_ms": 160
+        },
+        {
+          "asset": 65,
+          "duration_ms": 160
+        },
+        {
+          "asset": 66,
+          "duration_ms": 160
+        },
+        {
+          "asset": 67,
+          "duration_ms": 160
+        },
+        {
+          "asset": 68,
+          "duration_ms": 180
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 1,
+      "start_pose": "sit",
+      "end_pose": "stand",
+      "source_clip": "batch-c/turn/clip-complete-v1.json"
+    },
+    {
+      "id": "settle",
+      "label": "坐下",
+      "frames": [
+        {
+          "asset": 68,
+          "duration_ms": 120
+        },
+        {
+          "asset": 67,
+          "duration_ms": 160
+        },
+        {
+          "asset": 66,
+          "duration_ms": 160
+        },
+        {
+          "asset": 65,
+          "duration_ms": 160
+        },
+        {
+          "asset": 64,
+          "duration_ms": 160
+        },
+        {
+          "asset": 63,
+          "duration_ms": 140
+        },
+        {
+          "asset": 62,
+          "duration_ms": 140
+        },
+        {
+          "asset": 0,
+          "duration_ms": 180
+        }
+      ],
+      "playback": "once",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 2,
+      "start_pose": "stand",
+      "end_pose": "sit",
+      "source_clip": "batch-c/settle/clip-complete-v1.json"
+    },
+    {
+      "id": "listen",
+      "label": "聆听",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 700
+        },
+        {
+          "asset": 69,
+          "duration_ms": 160
+        },
+        {
+          "asset": 70,
+          "duration_ms": 1200
+        },
+        {
+          "asset": 71,
+          "duration_ms": 500
+        },
+        {
+          "asset": 72,
+          "duration_ms": 220
+        },
+        {
+          "asset": 73,
+          "duration_ms": 700
+        }
+      ],
+      "playback": "loop",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 3,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-c/listen/clip-v2.json"
+    },
+    {
+      "id": "think",
+      "label": "思考",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 700
+        },
+        {
+          "asset": 74,
+          "duration_ms": 600
+        },
+        {
+          "asset": 75,
+          "duration_ms": 400
+        },
+        {
+          "asset": 76,
+          "duration_ms": 250
+        },
+        {
+          "asset": 77,
+          "duration_ms": 300
+        },
+        {
+          "asset": 3,
+          "duration_ms": 100
+        }
+      ],
+      "playback": "loop",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 2,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-c/think/clip-complete-v1.json"
+    },
+    {
+      "id": "speak",
+      "label": "说话",
+      "frames": [
+        {
+          "asset": 0,
+          "duration_ms": 100
+        },
+        {
+          "asset": 78,
+          "duration_ms": 100
+        },
+        {
+          "asset": 0,
+          "duration_ms": 80
+        },
+        {
+          "asset": 79,
+          "duration_ms": 100
+        },
+        {
+          "asset": 78,
+          "duration_ms": 120
+        },
+        {
+          "asset": 0,
+          "duration_ms": 100
+        }
+      ],
+      "playback": "loop",
+      "hold_frame": 0,
+      "release_start_frame": 0,
+      "priority": 3,
+      "start_pose": "sit",
+      "end_pose": "sit",
+      "source_clip": "batch-c/speak/clip.json"
+    }
+  ],
+  "assets": [
+    {
+      "sha256": "4cb257760af8d1c1e8a58e2c2207b41db1f6f2de899d4add1ff4633e50bc5c60",
+      "id": 0,
+      "file": "4cb257760af8d1c1e8a58e2c2207b41db1f6f2de899d4add1ff4633e50bc5c60.png",
+      "bytes": 78504
+    },
+    {
+      "sha256": "27573a8914015930f6567a5ed76bc9a1f09cb65e401ebf114b8dc5499975a717",
+      "id": 1,
+      "file": "27573a8914015930f6567a5ed76bc9a1f09cb65e401ebf114b8dc5499975a717.png",
+      "bytes": 80490
+    },
+    {
+      "sha256": "2437ea0af000734d39f323afc7db360f7cb7e105e3cc8f4662d910b884463984",
+      "id": 2,
+      "file": "2437ea0af000734d39f323afc7db360f7cb7e105e3cc8f4662d910b884463984.png",
+      "bytes": 80473
+    },
+    {
+      "sha256": "de7020648608b30d949746c406894c58c3644226fd897c5d5b42f933f53f120d",
+      "id": 3,
+      "file": "de7020648608b30d949746c406894c58c3644226fd897c5d5b42f933f53f120d.png",
+      "bytes": 79495
+    },
+    {
+      "sha256": "189cb70c4eaf07186f489a25d953ec917c5f78d99164f8cfb3adfde80beec362",
+      "id": 4,
+      "file": "189cb70c4eaf07186f489a25d953ec917c5f78d99164f8cfb3adfde80beec362.png",
+      "bytes": 78370
+    },
+    {
+      "sha256": "aa9944e423f15737268890c10779242b6300c3372d5718749080e0ced5b75f32",
+      "id": 5,
+      "file": "aa9944e423f15737268890c10779242b6300c3372d5718749080e0ced5b75f32.png",
+      "bytes": 79467
+    },
+    {
+      "sha256": "59306cf487217f834305a68439702038a2117b63f48c43d42a28848afb2d3902",
+      "id": 6,
+      "file": "59306cf487217f834305a68439702038a2117b63f48c43d42a28848afb2d3902.png",
+      "bytes": 79345
+    },
+    {
+      "sha256": "7b4dd20033939798ddb50b851ea9d76c79d921202e561796cde2403288b5b0a1",
+      "id": 7,
+      "file": "7b4dd20033939798ddb50b851ea9d76c79d921202e561796cde2403288b5b0a1.png",
+      "bytes": 78978
+    },
+    {
+      "sha256": "986af0c6ad52d681f004c889ceb3427c7371d74e2fef89d89158bac92636b201",
+      "id": 8,
+      "file": "986af0c6ad52d681f004c889ceb3427c7371d74e2fef89d89158bac92636b201.png",
+      "bytes": 82423
+    },
+    {
+      "sha256": "eae3ee5a7bccd514c2e6a71c50938d9de520dae7b4dd37c4d344108def1345ef",
+      "id": 9,
+      "file": "eae3ee5a7bccd514c2e6a71c50938d9de520dae7b4dd37c4d344108def1345ef.png",
+      "bytes": 78207
+    },
+    {
+      "sha256": "e9e26762df1dec812248612d8c329df9f86a6a79a54bf6d336a0ad7fe54d3f99",
+      "id": 10,
+      "file": "e9e26762df1dec812248612d8c329df9f86a6a79a54bf6d336a0ad7fe54d3f99.png",
+      "bytes": 79202
+    },
+    {
+      "sha256": "1e3854afe016430a5ed55a882f62e8a9cfe74d5308c4e83c7da5d6e22fb6a1ad",
+      "id": 11,
+      "file": "1e3854afe016430a5ed55a882f62e8a9cfe74d5308c4e83c7da5d6e22fb6a1ad.png",
+      "bytes": 82553
+    },
+    {
+      "sha256": "0398f905b473baf2034709a3cbfff9e2fff2fbed1f73537a87284ae5c9c9c11c",
+      "id": 12,
+      "file": "0398f905b473baf2034709a3cbfff9e2fff2fbed1f73537a87284ae5c9c9c11c.png",
+      "bytes": 76950
+    },
+    {
+      "sha256": "449e984c9cb197421edd04d48631124bdf9ab64d07991d8570af3324420a0ecf",
+      "id": 13,
+      "file": "449e984c9cb197421edd04d48631124bdf9ab64d07991d8570af3324420a0ecf.png",
+      "bytes": 65529
+    },
+    {
+      "sha256": "616701973e47c9307cf49edf36bf593fe192d92c89176d8fbefacce6caafdb08",
+      "id": 14,
+      "file": "616701973e47c9307cf49edf36bf593fe192d92c89176d8fbefacce6caafdb08.png",
+      "bytes": 69846
+    },
+    {
+      "sha256": "294f96f1da67834c4736e4703bf9d59c1b3a3572286ba9f8dbe4a03d66e943ac",
+      "id": 15,
+      "file": "294f96f1da67834c4736e4703bf9d59c1b3a3572286ba9f8dbe4a03d66e943ac.png",
+      "bytes": 71351
+    },
+    {
+      "sha256": "8ee4e8fbe937a586010e2a397ded2710c1a0976481759b21d6f6b8bdd62308a4",
+      "id": 16,
+      "file": "8ee4e8fbe937a586010e2a397ded2710c1a0976481759b21d6f6b8bdd62308a4.png",
+      "bytes": 75323
+    },
+    {
+      "sha256": "b366d55bd180f2530490d215643347e82e7e08ca80e9d6afebfe36bd62ef8910",
+      "id": 17,
+      "file": "b366d55bd180f2530490d215643347e82e7e08ca80e9d6afebfe36bd62ef8910.png",
+      "bytes": 78051
+    },
+    {
+      "sha256": "caa220ddcc942aeb2ccedbf209f782eefb36dbac3a5c9d266ca0c39d6e6babf9",
+      "id": 18,
+      "file": "caa220ddcc942aeb2ccedbf209f782eefb36dbac3a5c9d266ca0c39d6e6babf9.png",
+      "bytes": 69260
+    },
+    {
+      "sha256": "1a6c36bfcbff1210dd8ea5cae50a9571cf3677b87214aaa62bc708d1a443af7e",
+      "id": 19,
+      "file": "1a6c36bfcbff1210dd8ea5cae50a9571cf3677b87214aaa62bc708d1a443af7e.png",
+      "bytes": 76295
+    },
+    {
+      "sha256": "592ee2bc9b966f4f21867a190bdb110f8fb6f501481856599ebd73c87ec37e06",
+      "id": 20,
+      "file": "592ee2bc9b966f4f21867a190bdb110f8fb6f501481856599ebd73c87ec37e06.png",
+      "bytes": 70716
+    },
+    {
+      "sha256": "2361e6b4053a9bbcf14287ef861742524552e86666d4f9c4bac099cc4fff80bd",
+      "id": 21,
+      "file": "2361e6b4053a9bbcf14287ef861742524552e86666d4f9c4bac099cc4fff80bd.png",
+      "bytes": 71175
+    },
+    {
+      "sha256": "0a965d25b095a10d4b81e0eed9ad29f9de392d9cff1ec0bde9192c8c672341bb",
+      "id": 22,
+      "file": "0a965d25b095a10d4b81e0eed9ad29f9de392d9cff1ec0bde9192c8c672341bb.png",
+      "bytes": 77222
+    },
+    {
+      "sha256": "d112a04e2748e5216126a054fae5d17ef4986e7a386eb4c7ae024c4cdb58949f",
+      "id": 23,
+      "file": "d112a04e2748e5216126a054fae5d17ef4986e7a386eb4c7ae024c4cdb58949f.png",
+      "bytes": 65246
+    },
+    {
+      "sha256": "e5d4c60f2b8837847f80828a2569a5d3822f20d9581b0e6af27609370f47dfaf",
+      "id": 24,
+      "file": "e5d4c60f2b8837847f80828a2569a5d3822f20d9581b0e6af27609370f47dfaf.png",
+      "bytes": 68732
+    },
+    {
+      "sha256": "50d1e598fd59ea00d678399ad29e17c909e076833bc5df8f09cc0e2234e4797d",
+      "id": 25,
+      "file": "50d1e598fd59ea00d678399ad29e17c909e076833bc5df8f09cc0e2234e4797d.png",
+      "bytes": 69472
+    },
+    {
+      "sha256": "9bae9ebfd42c4a7d37e150ed40be43e46a780858b730341da8cec054617b2f5e",
+      "id": 26,
+      "file": "9bae9ebfd42c4a7d37e150ed40be43e46a780858b730341da8cec054617b2f5e.png",
+      "bytes": 69325
+    },
+    {
+      "sha256": "a381de164929ff23a2eb27ff4fedf76bde746cc0527821f574afb71017af2a62",
+      "id": 27,
+      "file": "a381de164929ff23a2eb27ff4fedf76bde746cc0527821f574afb71017af2a62.png",
+      "bytes": 69088
+    },
+    {
+      "sha256": "53c034ca284aecca4fc508ce7bd668833d1905ef88a87ac75b179e543353d7fb",
+      "id": 28,
+      "file": "53c034ca284aecca4fc508ce7bd668833d1905ef88a87ac75b179e543353d7fb.png",
+      "bytes": 70510
+    },
+    {
+      "sha256": "ef8e40b23d5e4f18e8333555b00c26924cc5c92882c5728f5053ae02d04b3713",
+      "id": 29,
+      "file": "ef8e40b23d5e4f18e8333555b00c26924cc5c92882c5728f5053ae02d04b3713.png",
+      "bytes": 78164
+    },
+    {
+      "sha256": "17e069e3bcffbd4862055bd76efb2d7ff76dfb30f16411ec686c032b1b5620dd",
+      "id": 30,
+      "file": "17e069e3bcffbd4862055bd76efb2d7ff76dfb30f16411ec686c032b1b5620dd.png",
+      "bytes": 82646
+    },
+    {
+      "sha256": "638c55c2e7e79daa9ff43435bd15b2da53cf693fedf2dd2da41a253b018216f2",
+      "id": 31,
+      "file": "638c55c2e7e79daa9ff43435bd15b2da53cf693fedf2dd2da41a253b018216f2.png",
+      "bytes": 73946
+    },
+    {
+      "sha256": "91306e7f24bbe3992a93e132e66d7c1e0a3f45ce2e9894535f495a18b95148ea",
+      "id": 32,
+      "file": "91306e7f24bbe3992a93e132e66d7c1e0a3f45ce2e9894535f495a18b95148ea.png",
+      "bytes": 74175
+    },
+    {
+      "sha256": "03af8a5dafdb8f46b31a5684636d3c6581f93aeea1a988ddbbdc542239e23bd2",
+      "id": 33,
+      "file": "03af8a5dafdb8f46b31a5684636d3c6581f93aeea1a988ddbbdc542239e23bd2.png",
+      "bytes": 72907
+    },
+    {
+      "sha256": "93d17a774a9ec853cd7008d36e9452d19c253bb7fd1754537ee26643c74c5af5",
+      "id": 34,
+      "file": "93d17a774a9ec853cd7008d36e9452d19c253bb7fd1754537ee26643c74c5af5.png",
+      "bytes": 80091
+    },
+    {
+      "sha256": "3227c0f703d5512460c2cc5070d53b7f34804827f15a434f12bdc3a213498a2f",
+      "id": 35,
+      "file": "3227c0f703d5512460c2cc5070d53b7f34804827f15a434f12bdc3a213498a2f.png",
+      "bytes": 72388
+    },
+    {
+      "sha256": "4cc2b7c5938d2ac327d80a8e0f7012e5a5a2e9a4144f899ff4e77c057b450c51",
+      "id": 36,
+      "file": "4cc2b7c5938d2ac327d80a8e0f7012e5a5a2e9a4144f899ff4e77c057b450c51.png",
+      "bytes": 65589
+    },
+    {
+      "sha256": "5e0a6e5483db1d9cf60f612c49d0cad2c466b711952d79605a324212a4fc06fe",
+      "id": 37,
+      "file": "5e0a6e5483db1d9cf60f612c49d0cad2c466b711952d79605a324212a4fc06fe.png",
+      "bytes": 66939
+    },
+    {
+      "sha256": "6e3b4038406a7addedfa4bf3721f7c0562e9b613ac8745edf6ab35acef09c8b2",
+      "id": 38,
+      "file": "6e3b4038406a7addedfa4bf3721f7c0562e9b613ac8745edf6ab35acef09c8b2.png",
+      "bytes": 76146
+    },
+    {
+      "sha256": "21803133f151309e44f5067d25a25284a04fd5985761c13616086f005f78ea03",
+      "id": 39,
+      "file": "21803133f151309e44f5067d25a25284a04fd5985761c13616086f005f78ea03.png",
+      "bytes": 83655
+    },
+    {
+      "sha256": "ee2c53c1c8fc161ae95fb8a54bdf820978fa076fabcc97d933d062b69cf92c88",
+      "id": 40,
+      "file": "ee2c53c1c8fc161ae95fb8a54bdf820978fa076fabcc97d933d062b69cf92c88.png",
+      "bytes": 82560
+    },
+    {
+      "sha256": "12bd363cd013085034819c59e6fd1e45e8904dfc79b29034ab55321fd070ff27",
+      "id": 41,
+      "file": "12bd363cd013085034819c59e6fd1e45e8904dfc79b29034ab55321fd070ff27.png",
+      "bytes": 83674
+    },
+    {
+      "sha256": "859b17ed1f43d4de71a3b2fee257d2c9cd8cc53720f2b0e169d85de13284fc22",
+      "id": 42,
+      "file": "859b17ed1f43d4de71a3b2fee257d2c9cd8cc53720f2b0e169d85de13284fc22.png",
+      "bytes": 87100
+    },
+    {
+      "sha256": "50943e30bb0e7e616b6c445480ca2028b259ee3328e8cffbbdf9992d6a5d7499",
+      "id": 43,
+      "file": "50943e30bb0e7e616b6c445480ca2028b259ee3328e8cffbbdf9992d6a5d7499.png",
+      "bytes": 84860
+    },
+    {
+      "sha256": "1c1000487f2a853acd41d3884dbe8fb40c914aa94ac70e4e6064c2c706392633",
+      "id": 44,
+      "file": "1c1000487f2a853acd41d3884dbe8fb40c914aa94ac70e4e6064c2c706392633.png",
+      "bytes": 77770
+    },
+    {
+      "sha256": "7b5daccb5cb766249888f08ec35d9089710740805ffd86e5c0e29fc59d792eb8",
+      "id": 45,
+      "file": "7b5daccb5cb766249888f08ec35d9089710740805ffd86e5c0e29fc59d792eb8.png",
+      "bytes": 76880
+    },
+    {
+      "sha256": "22d7f582bc0c599cc67f6c56ef4474ad61417b5d852059b2a4d731c20fdb02c3",
+      "id": 46,
+      "file": "22d7f582bc0c599cc67f6c56ef4474ad61417b5d852059b2a4d731c20fdb02c3.png",
+      "bytes": 81208
+    },
+    {
+      "sha256": "475d648774061ee354bfef1a91e071bd52b7bdc6d8af67b06bfb5f75fa510e0a",
+      "id": 47,
+      "file": "475d648774061ee354bfef1a91e071bd52b7bdc6d8af67b06bfb5f75fa510e0a.png",
+      "bytes": 80013
+    },
+    {
+      "sha256": "5fd4552843f80398150d4662161b206d22eee6284ad3d20652d0059f250e13e3",
+      "id": 48,
+      "file": "5fd4552843f80398150d4662161b206d22eee6284ad3d20652d0059f250e13e3.png",
+      "bytes": 82608
+    },
+    {
+      "sha256": "70a5f426015cda77b264364823f075df81342024cfb61debb5167f2c8e67d19f",
+      "id": 49,
+      "file": "70a5f426015cda77b264364823f075df81342024cfb61debb5167f2c8e67d19f.png",
+      "bytes": 83308
+    },
+    {
+      "sha256": "195ad8a18f060565639ffdaff1ef7cb481ca62aeb463f17cda8384f38aeb88bb",
+      "id": 50,
+      "file": "195ad8a18f060565639ffdaff1ef7cb481ca62aeb463f17cda8384f38aeb88bb.png",
+      "bytes": 80351
+    },
+    {
+      "sha256": "9430b7d38844af147c9663b36988a0c339bf40a0af51b58dfd97b030baf9633a",
+      "id": 51,
+      "file": "9430b7d38844af147c9663b36988a0c339bf40a0af51b58dfd97b030baf9633a.png",
+      "bytes": 81941
+    },
+    {
+      "sha256": "0e1f90cf6cd39d5c0d25ff1b5b1a8ead4a8277a1f26b72df80380fe462b6d594",
+      "id": 52,
+      "file": "0e1f90cf6cd39d5c0d25ff1b5b1a8ead4a8277a1f26b72df80380fe462b6d594.png",
+      "bytes": 79865
+    },
+    {
+      "sha256": "c3e3ba18b1067b2ebbb1204d09108b9b9ca886bae3b9134efe895babc584bab5",
+      "id": 53,
+      "file": "c3e3ba18b1067b2ebbb1204d09108b9b9ca886bae3b9134efe895babc584bab5.png",
+      "bytes": 80509
+    },
+    {
+      "sha256": "a41d0a75e1a434986b0c7df83169699c336424f2b4fd90d38f2912600438990d",
+      "id": 54,
+      "file": "a41d0a75e1a434986b0c7df83169699c336424f2b4fd90d38f2912600438990d.png",
+      "bytes": 80671
+    },
+    {
+      "sha256": "9336a063953678974978974c960676eb37993a008df1dde24d5db26b88c1f913",
+      "id": 55,
+      "file": "9336a063953678974978974c960676eb37993a008df1dde24d5db26b88c1f913.png",
+      "bytes": 77995
+    },
+    {
+      "sha256": "c83a337fbd94a33c07e500d083a3968ec93c052671e09576482bf5c5afef2d92",
+      "id": 56,
+      "file": "c83a337fbd94a33c07e500d083a3968ec93c052671e09576482bf5c5afef2d92.png",
+      "bytes": 77335
+    },
+    {
+      "sha256": "0c122a7f639e5fc65adb2ea09d03854ba8b23a929d265239e39d23bb674f1239",
+      "id": 57,
+      "file": "0c122a7f639e5fc65adb2ea09d03854ba8b23a929d265239e39d23bb674f1239.png",
+      "bytes": 78159
+    },
+    {
+      "sha256": "b43c78d269d03e4ca98be9dfb62245110ddd2bd7633845f393d11580ac8eff86",
+      "id": 58,
+      "file": "b43c78d269d03e4ca98be9dfb62245110ddd2bd7633845f393d11580ac8eff86.png",
+      "bytes": 81130
+    },
+    {
+      "sha256": "5cd09f92fd5e888e444e026e6679b00866e902117b5ff9b8b874febd8c80fe35",
+      "id": 59,
+      "file": "5cd09f92fd5e888e444e026e6679b00866e902117b5ff9b8b874febd8c80fe35.png",
+      "bytes": 80347
+    },
+    {
+      "sha256": "2b814e15894e456e115e6e689fb7e4b2fa3d9ea2eb7071d316e8b4adea74bc42",
+      "id": 60,
+      "file": "2b814e15894e456e115e6e689fb7e4b2fa3d9ea2eb7071d316e8b4adea74bc42.png",
+      "bytes": 81828
+    },
+    {
+      "sha256": "f91860cd2afa8bcd92ebc19c24508b4ddbec761d6a858f93193938658858491f",
+      "id": 61,
+      "file": "f91860cd2afa8bcd92ebc19c24508b4ddbec761d6a858f93193938658858491f.png",
+      "bytes": 81252
+    },
+    {
+      "sha256": "817cb6f4fc65a9a8c86a3764e7b121005e3d6c16e399f34d165788eeb644e7b0",
+      "id": 62,
+      "file": "817cb6f4fc65a9a8c86a3764e7b121005e3d6c16e399f34d165788eeb644e7b0.png",
+      "bytes": 76228
+    },
+    {
+      "sha256": "32194813aaa21326aa81bb14e2c6caa51c9677e215f4151336f215329fca15a9",
+      "id": 63,
+      "file": "32194813aaa21326aa81bb14e2c6caa51c9677e215f4151336f215329fca15a9.png",
+      "bytes": 75112
+    },
+    {
+      "sha256": "cfe8ccffd438f1436c1f927c75602393f37a5bcdc7f7e77a30b0a118830eca60",
+      "id": 64,
+      "file": "cfe8ccffd438f1436c1f927c75602393f37a5bcdc7f7e77a30b0a118830eca60.png",
+      "bytes": 77837
+    },
+    {
+      "sha256": "58858df0778bb2205e8c0dabd59585ea6bcc22ba6d61fc83e1e78fc339ef2bf6",
+      "id": 65,
+      "file": "58858df0778bb2205e8c0dabd59585ea6bcc22ba6d61fc83e1e78fc339ef2bf6.png",
+      "bytes": 80224
+    },
+    {
+      "sha256": "ad0b56547e0feaec09a497fec6d86d7582cddf2fbabff9df3d87e856b9fcbaf4",
+      "id": 66,
+      "file": "ad0b56547e0feaec09a497fec6d86d7582cddf2fbabff9df3d87e856b9fcbaf4.png",
+      "bytes": 80272
+    },
+    {
+      "sha256": "37daf37dab3554b5001ad9f7d3fd119c0abebff3fb4b75a2cf8fb730491543a8",
+      "id": 67,
+      "file": "37daf37dab3554b5001ad9f7d3fd119c0abebff3fb4b75a2cf8fb730491543a8.png",
+      "bytes": 79102
+    },
+    {
+      "sha256": "c936072900cc1e58caf81996dc6c879f59b473dc50bb320e51bc80ec8236b01e",
+      "id": 68,
+      "file": "c936072900cc1e58caf81996dc6c879f59b473dc50bb320e51bc80ec8236b01e.png",
+      "bytes": 78202
+    },
+    {
+      "sha256": "c32ef0eb54142de91389961a7fdbca869cb7dbf11df87408db6c373ef809519b",
+      "id": 69,
+      "file": "c32ef0eb54142de91389961a7fdbca869cb7dbf11df87408db6c373ef809519b.png",
+      "bytes": 77384
+    },
+    {
+      "sha256": "59b276a2ad435a8d540d708f80076da1bab89a15efc547fa159a2d92d87fd6ad",
+      "id": 70,
+      "file": "59b276a2ad435a8d540d708f80076da1bab89a15efc547fa159a2d92d87fd6ad.png",
+      "bytes": 79003
+    },
+    {
+      "sha256": "7a627e985608c107ca031ad67a4c141a18ccf808a2b15b663150fa715d9e2bf9",
+      "id": 71,
+      "file": "7a627e985608c107ca031ad67a4c141a18ccf808a2b15b663150fa715d9e2bf9.png",
+      "bytes": 80670
+    },
+    {
+      "sha256": "495be353b0cfce32ae8c767f1ede084de585b20f067674a5283bbac6f5bda402",
+      "id": 72,
+      "file": "495be353b0cfce32ae8c767f1ede084de585b20f067674a5283bbac6f5bda402.png",
+      "bytes": 79573
+    },
+    {
+      "sha256": "68af8465181138e3a3f3dbc3441b31c903dbc35a48cdc46c8fe892dbde824434",
+      "id": 73,
+      "file": "68af8465181138e3a3f3dbc3441b31c903dbc35a48cdc46c8fe892dbde824434.png",
+      "bytes": 80470
+    },
+    {
+      "sha256": "219949e671bc4d78a339662e9647468a7e92efce0533a0684a4980335dc5911b",
+      "id": 74,
+      "file": "219949e671bc4d78a339662e9647468a7e92efce0533a0684a4980335dc5911b.png",
+      "bytes": 78671
+    },
+    {
+      "sha256": "663c901c18747be10fa1d73dc08b1df16328b977beeb8116b5c52487571caa09",
+      "id": 75,
+      "file": "663c901c18747be10fa1d73dc08b1df16328b977beeb8116b5c52487571caa09.png",
+      "bytes": 79801
+    },
+    {
+      "sha256": "7cda9b70729f79ccce823a9b98aa90c42ad15f191ac58e5c6ed54416ff69a2b9",
+      "id": 76,
+      "file": "7cda9b70729f79ccce823a9b98aa90c42ad15f191ac58e5c6ed54416ff69a2b9.png",
+      "bytes": 80865
+    },
+    {
+      "sha256": "faf639a77d2aa97f68377f20b4a97999238e93ec711dafc55b15a7f05c89b06f",
+      "id": 77,
+      "file": "faf639a77d2aa97f68377f20b4a97999238e93ec711dafc55b15a7f05c89b06f.png",
+      "bytes": 80475
+    },
+    {
+      "sha256": "4f0a8ae220daee99c9e54d470d9d8ccbc1affbcf59765e6ca72aee75b0cb2c7b",
+      "id": 78,
+      "file": "4f0a8ae220daee99c9e54d470d9d8ccbc1affbcf59765e6ca72aee75b0cb2c7b.png",
+      "bytes": 80685
+    },
+    {
+      "sha256": "62b9a41af74bce48c5182f2dd09ae89aeafd69445f4a7444994c54f27d239052",
+      "id": 79,
+      "file": "62b9a41af74bce48c5182f2dd09ae89aeafd69445f4a7444994c54f27d239052.png",
+      "bytes": 80287
+    },
+    {
+      "sha256": "ff1153348d3fc94b3a4d50a19cbebe13566872a6f3cf92288b635aafe228e3cc",
+      "id": 80,
+      "file": "ff1153348d3fc94b3a4d50a19cbebe13566872a6f3cf92288b635aafe228e3cc.png",
+      "bytes": 59789
+    },
+    {
+      "sha256": "7dd25b07270f187f355fb7004085b5962fb2d198e074d82bf17a211bc5dd37ad",
+      "id": 81,
+      "file": "7dd25b07270f187f355fb7004085b5962fb2d198e074d82bf17a211bc5dd37ad.png",
+      "bytes": 59911
+    }
+  ],
+  "resource_canvas": [
+    320,
+    320
+  ],
+  "display_canvas": [
+    256,
+    256
+  ],
+  "anchor_px": [
+    160,
+    288
+  ],
+  "visual_approval": false,
+  "hardware_verified": false,
+  "selection": {
+    "purpose": "V1 PET APP integration for visual acceptance; not final visual approval",
+    "clip_overrides": {
+      "walk": "batch-c/walk/clip-v4-transitions.json"
+    },
+    "notes": [
+      "Use the latest 12-pose walking study for app review; retain the original production selection.",
+      "Known support drift and abrupt paw transitions remain; real motion and mirror require hardware review."
+    ]
+  },
+  "revision": "b8239a6ce265bbbd"
+}

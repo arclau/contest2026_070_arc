@@ -59,6 +59,22 @@ void dm_net_bt_pair_reply(int accept);
  * connectable+discoverable），on=0 恢复仅可连接 */
 void dm_net_bt_set_discoverable(int on);
 
+/* 可发现模式真实状态（来自 on_scan_mode_changed 回调，UI 回读开关用） */
+int  dm_net_bt_is_discoverable(void);
+
+/* AVRCP Target：手机端遥控命令码（dm_net_bt_avrcp_take 的返回值）。
+ * 回调在 socket 线程写、LVGL 线程取，取走即清空。 */
+#define DM_AVRCP_CMD_NONE   0
+#define DM_AVRCP_CMD_PLAY   1
+#define DM_AVRCP_CMD_PAUSE  2
+#define DM_AVRCP_CMD_NEXT   3
+#define DM_AVRCP_CMD_PREV   4
+
+int  dm_net_bt_avrcp_take(void);
+
+/* 手机是否正在通过 A2DP 向我们推流（1=推流中）。推流期间本地播放让路。 */
+int  dm_net_bt_a2dp_streaming(void);
+
 /* 已配对设备列表（bt_adapter_get_bonded_devices 查询，UI 轮询刷新）：
  * refresh 后 count/get 读取；设备名查不到时置空由 UI 显示"未知设备" */
 int  dm_net_bt_paired_refresh(void);
@@ -106,6 +122,10 @@ void dm_net_wifi_connect_abort(void);
 
 /* 当前已连接网络的 SSID（经 wifi_get_setting 查询；未连接时置空） */
 int  dm_net_wifi_cur_ssid(char *buf, int buflen);
+
+/* 2026-11-01 P330：当前 Wi-Fi 的 IPv4 地址（配对页二维码用）。
+ * @return 0 = 已取到并写入 buf；-1 = 未连接/无地址 */
+int  dm_net_wifi_ip(char *buf, int buflen);
 
 /* 2026-09-10 P206：断开当前 AP（wifi_disconnect 封装；无 forget 接口，
  * 详见 dm_net.c）；@return 0=成功，-1=失败 */

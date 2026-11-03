@@ -48,6 +48,8 @@ int dm_ai_voice_speaking(void);
  * stt/llm 缓冲（可为 NULL 跳过）并返回 1，无新事件返回 0。 */
 int dm_ai_voice_evt_subscribe(void);
 int dm_ai_voice_evt_unsubscribe(void);
+/* P363：订阅连接保活/自愈（300ms 定时调用）。连接卡死时主动重连。 */
+void dm_ai_voice_evt_keepalive(void);
 int dm_ai_voice_evt_poll(char *stt, int stt_cap,
                          char *llm, int llm_cap);
 
@@ -58,9 +60,17 @@ int dm_ai_voice_evt_poll(char *stt, int stt_cap,
  * 有新 cmd 事件则拷入 cmd（如 "volume:-5"）并返回 1，否则返回 0。 */
 int dm_ai_voice_evt_cmd_poll(char *cmd, int cmd_cap);
 
-/* 2026-08-23 review-10：消费 agent TTS 播报完成信号（kind=done），
- * 供音频仲裁层在播报结束后恢复被挂起的音乐。有新事件返回 1。 */
+/* P352：消费 ASR 失败提示（agent 侧 ASR 失败时广播 kind=error，
+ * 如断网时的"网络连不上…"）。有新事件则拷入 err 并返回 1。
+ * 单独一条通道，别和 stt/llm 混——失败时本来就没有识别文本。 */
+int dm_ai_voice_evt_err_poll(char *err, int err_cap);
+
+/* 消费 agent TTS 播报完成信号（kind=done）。有新事件返回 1。 */
 int dm_ai_voice_evt_done_poll(void);
+
+/* 消费 agent 语音阶段变化：1=聆听，2=思考，3=播报，0=空闲。
+ * 没有新阶段时返回 -1。 */
+int dm_ai_voice_evt_phase_poll(void);
 
 /* 2026-08-11 MIC DEMO: trigger a 5s mic recording + auto-playback on the
  * agent side ({"type":"mic","action":"demo"}). Fire-and-forget. */

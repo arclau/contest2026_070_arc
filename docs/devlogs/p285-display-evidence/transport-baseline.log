@@ -1,0 +1,34 @@
+cmd[00]=b9 len=3 DT=29 expected_RK_DCS=39
+cmd[01]=b1 len=13 DT=29 expected_RK_DCS=39
+cmd[02]=d2 len=2 DT=29 expected_RK_DCS=39
+cmd[03]=b2 len=14 DT=29 expected_RK_DCS=39
+cmd[04]=b4 len=14 DT=29 expected_RK_DCS=39
+cmd[05]=cc len=1 DT=23 expected_RK_DCS=15
+cmd[06]=d3 len=39 DT=29 expected_RK_DCS=39
+cmd[07]=d5 len=44 DT=29 expected_RK_DCS=39
+cmd[08]=d6 len=44 DT=29 expected_RK_DCS=39
+cmd[09]=e7 len=27 DT=29 expected_RK_DCS=39
+cmd[10]=bd len=1 DT=23 expected_RK_DCS=15
+cmd[11]=e7 len=9 DT=29 expected_RK_DCS=39
+cmd[12]=bd len=1 DT=23 expected_RK_DCS=15
+cmd[13]=b6 len=3 DT=29 expected_RK_DCS=39
+cmd[14]=c1 len=1 DT=23 expected_RK_DCS=15
+cmd[15]=bd len=1 DT=23 expected_RK_DCS=15
+cmd[16]=c1 len=57 DT=29 expected_RK_DCS=39
+cmd[17]=bd len=1 DT=23 expected_RK_DCS=15
+cmd[18]=c1 len=57 DT=29 expected_RK_DCS=39
+cmd[19]=bd len=1 DT=23 expected_RK_DCS=15
+cmd[20]=c1 len=57 DT=29 expected_RK_DCS=39
+cmd[21]=bd len=1 DT=23 expected_RK_DCS=15
+cmd[22]=c0 len=4 DT=29 expected_RK_DCS=39
+cmd[23]=bf len=5 DT=29 expected_RK_DCS=39
+cmd[24]=c7 len=10 DT=29 expected_RK_DCS=39
+cmd[25]=ce len=1 DT=23 expected_RK_DCS=15
+cmd[26]=e5 len=13 DT=29 expected_RK_DCS=39
+cmd[27]=e6 len=60 DT=29 expected_RK_DCS=39
+cmd[28]=35 len=0 DT=05 expected_RK_DCS=05
+cmd[29]=11 len=0 DT=05 expected_RK_DCS=05
+cmd[30]=29 len=0 DT=05 expected_RK_DCS=05
+payloads_pass=31 packet_type_mismatches=28
+mode=0 loop_n1=49 pixel_dt=3e pixel_wc=2160 hsa=50 hbp=84 hfp=74 vsa=2 vbp=15 vact=1440 vt=1657 eotp=0
+mode=2 loop_n1=4064 pixel_dt=3e pixel_wc=2160 hsa=0 hbp=0 hfp=0 vsa=2 vbp=15 vact=1440 vt=1657 eotp=0

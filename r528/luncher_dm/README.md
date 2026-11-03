@@ -39,10 +39,11 @@
 在 openvela 工程根目录执行（GCC 13.4.0 由 SDK 自动注入）：
 
 ```bash
-./build.sh vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/deskmate -j$(nproc)
+./build.sh vendor/allwinnertech/boards/r528/ynm3000/configs/deskmate -j$(nproc)
 ```
 
-打包与烧录（整包 NAND 镜像，`res` 分区含 WiFi 固件/字体/提示音）见工程 `lichee/pack` 流程。
+打包入口：`bash vendor/allwinnertech/tools/pack_deskmate.sh ynm3000`，产物 `output/ynm3000/ynm3000.img`（整包 NAND，`res` 分区含 WiFi 固件/字体/提示音）。
+注意：`r528s3-gemini-s1/configs/deskmate` 是 1440×720 + V2 app + 无触摸驱动的漂移配置，不要用于本应用。
 
 ## 说明
 

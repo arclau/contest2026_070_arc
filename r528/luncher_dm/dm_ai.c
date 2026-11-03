@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 
 #include "dm_ai.h"
+#include "dm_pet.h"
 #include "dm_voice.h"   /* 2026-08-28 Step 3：AI 对话开始时间戳（Director 静默窗口） */
 
 #define AI_WS_HOST   "127.0.0.1"
@@ -421,9 +422,13 @@ static void *ai_worker(void *arg)
          * UI 盲等 30s。转义后任意文本均可安全传输。 */
         char esc[AI_REQ_MAX * 2 + 1];
         json_escape(g_ai_req, esc, sizeof(esc));
-        char json[sizeof(esc) + 64];
+        char json[sizeof(esc) + 96];
+        /* 2026-11-02 P345：快问按钮没有录音，走的是文本通道；带上
+         * speak:true 让 agent 把回答同时用 TTS 念出来（原来只上屏不出声，
+         * 用户在语音页点"今天天气"以为坏了）。 */
         snprintf(json, sizeof(json),
-                 "{\"type\":\"message\",\"content\":\"%s\",\"chat_id\":\"ui\"}",
+                 "{\"type\":\"message\",\"content\":\"%s\","
+                 "\"chat_id\":\"ui\",\"speak\":1}",
                  esc);
         if (ws_send_text(fd, json) < 0)
             goto fail;
@@ -703,6 +708,21 @@ int dm_ai_mic_demo(void)
 static pthread_t        g_ai_evt_thread;
 static volatile int     g_ai_evt_run;      /* 1 = 订阅线程运行中 */
 static volatile int     g_ai_evt_fd = -1;  /* 常驻连接 fd（unsubscribe 唤醒） */
+/* P363：订阅连接心跳。实测板上会卡在 FIN_WAIT_1 —— 对端不关、recv 一直
+ * 返回 EAGAIN，线程既收不到事件也不重连，宠物/语音指令/气泡全部失效。
+ * 这里靠主动 ping 探活：10s 发一次，25s 收不到任何帧就 shutdown 逼重连。 */
+static volatile uint64_t g_ai_evt_rx_ms;
+static volatile uint64_t g_ai_evt_ping_ms;
+/* worker 每转一圈（含重连重试的 usleep）自增。只看 fd<0 判断"线程死了"
+ * 是错的：开机时 agent 还没起来，fd 本来就是 -1，重试期间也一直是 -1。
+ * 第一版就这么误判，硬重启订阅线程 → 变成两条订阅，每条事件都送两遍，
+ * 宠物动作被打断重来、帧缓存被反复冲掉（实测 missing frame 从 4 涨到 15）。 */
+static volatile uint32_t g_ai_evt_beat;
+/* 活着的 worker 线程数（0/1）。subscribe 见它非 0 就拒绝再建——只靠
+ * g_ai_evt_run 挡不住：自愈路径是 run=0 再立刻 subscribe，老线程还没退，
+ * 新线程已经起来，两条订阅并存（P363 实测 missing frame 4→15）。
+ * 现在是 run=0 → subscribe 拒绝 → 老线程下一圈自己退出 → 下一拍再订阅。 */
+static volatile int     g_ai_evt_threads;
 static char             g_ai_evt_stt[AI_RESP_MAX];
 static char             g_ai_evt_llm[AI_RESP_MAX];
 static volatile unsigned g_ai_evt_stt_seq;
@@ -711,9 +731,22 @@ static volatile unsigned g_ai_evt_llm_seq;
  * {"type":"voice_evt","kind":"cmd","text":"volume:-5"|"brightness:+5"}） */
 static char             g_ai_evt_cmd[64];
 static volatile unsigned g_ai_evt_cmd_seq;
-/* 2026-08-23 review-10：agent TTS 播报完成信号（voice_evt kind=done）。
- * 由订阅线程置位，音频仲裁层 dm_audio_fg_poll 消费恢复音乐。 */
+/* P352：ASR 失败提示（agent 侧断网/没听清时广播 kind=error）。
+ * 单独一条通道，不走 llm——llm 只表示"模型回了话"，语义别混。 */
+static char             g_ai_evt_err[64];
+static volatile unsigned g_ai_evt_err_seq;
+/* agent TTS 播报完成信号（voice_evt kind=done）。 */
 static volatile int     g_ai_speak_done;
+/* 0=idle, 1=listening, 2=thinking, 3=speaking.
+ * Written by the event thread, consumed by the LVGL timer. */
+static volatile int      g_ai_voice_phase;
+static volatile unsigned g_ai_voice_phase_seq;
+
+static void ai_voice_phase_set(int phase)
+{
+    g_ai_voice_phase = phase;
+    g_ai_voice_phase_seq++;
+}
 
 /* 从 voice_evt JSON 中取 "key":"value"（简单解析，与 extract_content 同风格） */
 static void evt_extract(const char *json, const char *key,
@@ -757,6 +790,7 @@ static void *ai_evt_worker(void *arg)
     (void)arg;
     while (g_ai_evt_run)
         {
+            g_ai_evt_beat++;
             int fd = ai_ws_connect();
             if (fd < 0)
                 {
@@ -764,10 +798,15 @@ static void *ai_evt_worker(void *arg)
                     continue;
                 }
             g_ai_evt_fd = fd;
+            g_ai_evt_rx_ms = ai_speak_now_ms();
+            g_ai_evt_ping_ms = g_ai_evt_rx_ms;
             static char buf[AI_RESP_MAX];
             while (g_ai_evt_run)
                 {
+                    g_ai_evt_beat++;
                     int n = ws_recv_text(fd, buf, sizeof(buf));
+                    if (n >= 0)
+                        g_ai_evt_rx_ms = ai_speak_now_ms();   /* 收到帧（含 pong）= 链路活着 */
                     if (n == 0)
                         continue;   /* P215：ping 已回 pong，无消息但连接正常 */
                     if (n < 0)
@@ -789,10 +828,35 @@ static void *ai_evt_worker(void *arg)
                             static char text[AI_RESP_MAX];
                             evt_extract(buf, "kind", kind, sizeof(kind));
                             evt_extract(buf, "text", text, sizeof(text));
-                            /* 2026-08-23 review-10：agent 播报完成信号（text 为空，
-                             * 必须在 text[0] 判空之外处理，供音频仲裁层恢复音乐） */
-                            if (strcmp(kind, "done") == 0)
-                                g_ai_speak_done = 1;
+                            /* P363：收包可见性。此前这条链路静默失效时
+                             * 串口一行都没有，只能靠猜。 */
+                            printf("[voice-evt] %s\n", kind);
+                            /* agent 播报完成信号（text 为空，需在 text[0] 判空之外处理） */
+                            if (strcmp(kind,"pet_listen")==0)
+                                {
+                                    ai_voice_phase_set(1);
+                                    dm_pet_on_event_param(PET_EVT_VOICE_PHASE,1);
+                                }
+                            else if (strcmp(kind,"pet_think")==0)
+                                {
+                                    ai_voice_phase_set(2);
+                                    dm_pet_on_event_param(PET_EVT_VOICE_PHASE,2);
+                                }
+                            else if (strcmp(kind,"pet_speak")==0)
+                                {
+                                    ai_voice_phase_set(3);
+                                    dm_pet_on_event_param(PET_EVT_VOICE_PHASE,3);
+                                }
+                            else if (strcmp(kind,"pet_idle")==0)
+                                {
+                                    ai_voice_phase_set(0);
+                                    dm_pet_on_event_param(PET_EVT_VOICE_PHASE,0);
+                                }
+                            else if (strcmp(kind, "done") == 0)
+                                {
+                                    g_ai_speak_done = 1;
+                                    ai_voice_phase_set(0);
+                                }
                             else if (text[0])
                                 {
                                     if (strcmp(kind, "stt") == 0)
@@ -817,27 +881,108 @@ static void *ai_evt_worker(void *arg)
                                             g_ai_evt_cmd[sizeof(g_ai_evt_cmd) - 1] = '\0';
                                             g_ai_evt_cmd_seq++;
                                         }
+                                    else if (strcmp(kind, "error") == 0)
+                                        {
+                                            /* P352：ASR 失败（多半是断网/没听清）。
+                                             * 用户按完语音键不能"猫闪一下就没了"，
+                                             * 存起来让系统级 timer 弹宠物气泡。 */
+                                            strncpy(g_ai_evt_err, text,
+                                                sizeof(g_ai_evt_err) - 1);
+                                            g_ai_evt_err[sizeof(g_ai_evt_err) - 1] = '\0';
+                                            g_ai_evt_err_seq++;
+                                        }
                                 }
                         }
                 }
+            dm_pet_on_event_param(PET_EVT_VOICE_PHASE,0);
+            ai_voice_phase_set(0);
             close(fd);
             g_ai_evt_fd = -1;
         }
+    g_ai_evt_threads = 0;
     return NULL;
 }
 
 int dm_ai_voice_evt_subscribe(void)
 {
-    if (g_ai_evt_run)
+    /* 幂等：线程还活着（哪怕只是还没连上 agent）就绝不再开第二条。 */
+    if (g_ai_evt_run || g_ai_evt_threads > 0)
         return 0;
+    g_ai_evt_threads = 1;
     g_ai_evt_run = 1;
     if (pthread_create(&g_ai_evt_thread, NULL, ai_evt_worker, NULL) != 0)
         {
             g_ai_evt_run = 0;
+            g_ai_evt_threads = 0;
             return -1;
         }
     pthread_detach(g_ai_evt_thread);
     return 0;
+}
+
+/* P363：订阅连接保活/自愈（300ms 定时调用）。
+ *
+ * 实测失效形态：板上 /proc/net/tcp 里只剩一条卡在 FIN_WAIT_1 的连接，
+ * 对端不关、本端 recv 一直返回 EAGAIN —— 线程既不报错也不重连。此后
+ * 宠物语音相位、语音指令（cmd）、断网气泡、对话文字全部收不到，而界面
+ * 看上去"什么都没坏"（用户反馈：AI 回复时猫一直在睡）。
+ *
+ * 做法：每 10s 发一个 WS ping（agent 侧 opcode 0x9 会回 pong），25s 收
+ * 不到任何帧就 shutdown，让 worker 的 recv 立刻返回并重连。 */
+void dm_ai_voice_evt_keepalive(void)
+{
+    if (!g_ai_evt_run)
+        {
+            dm_ai_voice_evt_subscribe();   /* 线程没起来 → 自愈 */
+            return;
+        }
+
+    uint64_t now = ai_speak_now_ms();
+    int fd = g_ai_evt_fd;
+
+    /* 心跳：worker 只要还在跑（哪怕正在重连重试）就会推进，只有线程真的
+     * 退出了才停。绝不能用 fd<0 当判据 —— 开机 agent 未起时 fd 本来就是 -1。 */
+    static uint32_t last_beat;
+    static uint64_t beat_ms;
+    if (g_ai_evt_beat != last_beat || beat_ms == 0)
+        {
+            last_beat = g_ai_evt_beat;
+            beat_ms = now;
+        }
+
+    if (fd < 0)
+        {
+            /* 线程死了才重启；活着的重连中一律不动（否则会开出第二条订阅，
+             * 每条事件送两遍，宠物动作被打断重来）。 */
+            if (g_ai_evt_threads == 0 && now - beat_ms > 15000)
+                {
+                    printf("[voice-evt] subscriber gone, restarting\n");
+                    g_ai_evt_run = 0;
+                    dm_ai_voice_evt_subscribe();
+                    beat_ms = now;
+                }
+            return;
+        }
+
+    if (g_ai_evt_rx_ms && now - g_ai_evt_rx_ms > 25000)
+        {
+            static uint64_t last_log;
+            if (now - last_log > 30000)
+                {
+                    last_log = now;
+                    printf("[voice-evt] subscription dead (%llums), reconnecting\n",
+                           (unsigned long long)(now - g_ai_evt_rx_ms));
+                }
+            shutdown(fd, SHUT_RDWR);
+            return;
+        }
+
+    if (now - g_ai_evt_ping_ms > 10000)
+        {
+            unsigned char ping[2] = { 0x89, 0x00 };   /* FIN + ping, 空负载 */
+            send(fd, ping, sizeof(ping), 0);
+            g_ai_evt_ping_ms = now;
+        }
 }
 
 int dm_ai_voice_evt_unsubscribe(void)
@@ -923,8 +1068,29 @@ int dm_ai_voice_evt_cmd_poll(char *cmd, int cmd_cap)
     return 0;
 }
 
+/* P352：消费 ASR 失败提示（voice_evt kind=error）。
+ * 有新事件则拷入 err 并返回 1，否则返回 0。 */
+int dm_ai_voice_evt_err_poll(char *err, int err_cap)
+{
+    static unsigned last_err_seq;
+    if (!err || err_cap <= 0)
+        return 0;
+    unsigned es = g_ai_evt_err_seq;
+    if (es != last_err_seq)
+        {
+            last_err_seq = es;
+            if (g_ai_evt_err[0])
+                {
+                    strncpy(err, g_ai_evt_err, err_cap - 1);
+                    err[err_cap - 1] = '\0';
+                    return 1;
+                }
+        }
+    return 0;
+}
+
 /* 2026-08-23 review-10：消费 agent TTS 播报完成信号（kind=done）。
- * 有新 done 事件则返回 1（供音频仲裁层恢复音乐），否则返回 0。 */
+ * 有新 done 事件则返回 1，否则返回 0。 */
 int dm_ai_voice_evt_done_poll(void)
 {
     if (g_ai_speak_done)
@@ -933,4 +1099,15 @@ int dm_ai_voice_evt_done_poll(void)
             return 1;
         }
     return 0;
+}
+
+int dm_ai_voice_evt_phase_poll(void)
+{
+    static unsigned last_seq;
+    unsigned seq = g_ai_voice_phase_seq;
+
+    if (seq == last_seq)
+        return -1;
+    last_seq = seq;
+    return g_ai_voice_phase;
 }

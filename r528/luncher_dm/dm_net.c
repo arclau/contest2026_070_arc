@@ -9,7 +9,15 @@
 #include "bluetooth.h"
 #include "bt_adapter.h"
 #include "bt_device.h"     /* bt_device_pair_request_reply */
+#ifdef CONFIG_BLUETOOTH_AVRCP_TARGET
+#include "bt_avrcp_target.h"  /* 手机遥控本机播放（AVRCP Target） */
+#endif
+#ifdef CONFIG_BLUETOOTH_A2DP_SINK
+#include "bt_a2dp_sink.h"     /* 手机推流状态（本地播放要让路） */
+#endif
 #include "netutils/netlib.h"  /* netlib_obtain_ipv4addr（连接成功后 DHCP） */
+#include <arpa/inet.h>        /* inet_ntoa（P330 取 Wi-Fi IP） */
+#include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <string.h>
@@ -40,6 +48,24 @@ static volatile int     g_conn_gen;     /* 连接代数（wifijianyi.md：UI 取
 static bt_instance_t        *g_bt_ins;
 static bt_adapter_state_t    g_bt_state = BT_ADAPTER_STATE_OFF;
 static int                   g_bt_tick;
+static bt_scan_mode_t        g_bt_scan_mode = BT_SCAN_MODE_NONE;
+static int                   g_bt_cb_registered;
+
+static bt_instance_t *dm_net_bt_ensure_ins(void);
+
+/* AVRCP Target：手机端按播放/暂停/切歌时由 bluetoothd 回调到这里。
+ * 回调跑在 socket 线程，不能直接碰 LVGL —— 只写一个待办码，
+ * 由 LVGL 侧常驻 timer 取出执行。命令码定义见 dm_net.h。 */
+
+#ifdef CONFIG_BLUETOOTH_AVRCP_TARGET
+static volatile int g_avrcp_cmd;
+static void        *g_avrcp_cookie;
+#endif
+
+#ifdef CONFIG_BLUETOOTH_A2DP_SINK
+static volatile int g_a2dp_streaming;
+static void        *g_a2dp_cookie;
+#endif
 
 /* 蓝牙发现缓存（wifijianyi.md）：回调运行在 bluetoothd socket 线程，
  * 只更新静态数组 + 去重，UI 线程轮询拉取。 */
@@ -53,9 +79,7 @@ static uint8_t               g_bt_pair_addr[6];
  * 每次需要实例时若 socket 通信失败则重建。 */
 static bt_instance_t *dm_net_bt_get_ins(void)
 {
-    if (g_bt_ins == NULL)
-        g_bt_ins = bluetooth_create_instance();
-    return g_bt_ins;
+    return dm_net_bt_ensure_ins();
 }
 
 static void dm_net_bt_reconnect(void)
@@ -63,6 +87,16 @@ static void dm_net_bt_reconnect(void)
     if (g_bt_ins) {
         bt_instance_t *old = g_bt_ins;
         g_bt_ins = NULL;   /* 死句柄丢弃，下次 get_ins 重建 */
+        g_bt_cb_registered = 0;
+        g_bt_state = BT_ADAPTER_STATE_OFF;
+        g_bt_scan_mode = BT_SCAN_MODE_NONE;
+#ifdef CONFIG_BLUETOOTH_AVRCP_TARGET
+        g_avrcp_cookie = NULL;
+#endif
+#ifdef CONFIG_BLUETOOTH_A2DP_SINK
+        g_a2dp_cookie = NULL;
+        g_a2dp_streaming = 0;
+#endif
         (void)old;
     }
 }
@@ -112,10 +146,137 @@ static void dm_net_bt_pair_req_cb(void *cookie, bt_address_t *addr)
     g_bt_pair_pending = 1;
 }
 
+/* on_adapter_state_changed（socket 线程）：适配器真实开关状态。
+ * 2026-10-29 P300：此前 dm_net_bt_set 直接写死 g_bt_state=ON，enable 失败
+ * （HCI 未就绪）时 UI 仍显示已开启，扫描静默失败——改为只信回调。 */
+static void dm_net_bt_state_cb(void *cookie, bt_adapter_state_t state)
+{
+    (void)cookie;
+    g_bt_state = state;
+    if (state != BT_ADAPTER_STATE_ON && state != BT_ADAPTER_STATE_BLE_ON)
+        g_bt_scan_done = 1;   /* 适配器关闭：结束本轮发现，UI 退出“搜索中” */
+}
+
+/* on_scan_mode_changed（socket 线程）：可发现模式真实值，供 UI 回读 */
+static void dm_net_bt_scan_mode_cb(void *cookie, bt_scan_mode_t mode)
+{
+    (void)cookie;
+    g_bt_scan_mode = mode;
+}
+
+#ifdef CONFIG_BLUETOOTH_AVRCP_TARGET
+/* 手机面板操作 → 待办码。只在按下沿动作（AVRCP 会发 press+release 两条）。 */
+static void dm_net_avrcp_panel_cb(void *cookie, bt_address_t *addr, uint8_t op,
+                                  uint8_t state)
+{
+    (void)cookie;
+    (void)addr;
+
+    if (state != AVRCP_KEY_PRESSED)
+        return;
+
+    switch (op) {
+    case PASSTHROUGH_CMD_ID_PLAY:
+        g_avrcp_cmd = DM_AVRCP_CMD_PLAY;
+        break;
+    case PASSTHROUGH_CMD_ID_PAUSE:
+        g_avrcp_cmd = DM_AVRCP_CMD_PAUSE;
+        break;
+    case PASSTHROUGH_CMD_ID_FORWARD:
+        g_avrcp_cmd = DM_AVRCP_CMD_NEXT;
+        break;
+    case PASSTHROUGH_CMD_ID_BACKWARD:
+        g_avrcp_cmd = DM_AVRCP_CMD_PREV;
+        break;
+    default:
+        break;
+    }
+}
+
+int dm_net_bt_avrcp_take(void)
+{
+    int cmd = g_avrcp_cmd;
+
+    g_avrcp_cmd = DM_AVRCP_CMD_NONE;
+    return cmd;
+}
+#else
+int dm_net_bt_avrcp_take(void)
+{
+    return DM_AVRCP_CMD_NONE;
+}
+#endif
+
+#ifdef CONFIG_BLUETOOTH_A2DP_SINK
+/* 手机开始/停止向我们推流。推流期间本地曲库必须让路：
+ * 两条通路都写 hw:audiocodec，同时开会互相抢占（EBUSY / 混音错乱）。 */
+static void dm_net_a2dp_audio_state_cb(void *cookie, bt_address_t *addr,
+                                       a2dp_audio_state_t state)
+{
+    (void)cookie;
+    (void)addr;
+
+    g_a2dp_streaming = (state == A2DP_AUDIO_STATE_STARTED);
+}
+
+int dm_net_bt_a2dp_streaming(void)
+{
+    return g_a2dp_streaming;
+}
+#else
+int dm_net_bt_a2dp_streaming(void)
+{
+    return 0;
+}
+#endif
+
+/* 一次性注册全部适配器回调。此前 start_scan 每轮重注册且只填 3 个字段，
+ * 会把状态/扫描模式回调清成 NULL，故改为实例创建时注册一次。 */
+static bt_instance_t *dm_net_bt_ensure_ins(void)
+{
+    if (g_bt_ins == NULL)
+        g_bt_ins = bluetooth_create_instance();
+
+    if (g_bt_ins && !g_bt_cb_registered) {
+        adapter_callbacks_t cbs;
+
+        memset(&cbs, 0, sizeof(cbs));
+        cbs.on_adapter_state_changed   = dm_net_bt_state_cb;
+        cbs.on_scan_mode_changed       = dm_net_bt_scan_mode_cb;
+        cbs.on_discovery_result        = dm_net_bt_discovery_cb;
+        cbs.on_discovery_state_changed = dm_net_bt_disc_state_cb;
+        cbs.on_pair_request            = dm_net_bt_pair_req_cb;
+        bt_adapter_register_callback(g_bt_ins, &cbs);
+        g_bt_cb_registered = 1;
+
+#ifdef CONFIG_BLUETOOTH_AVRCP_TARGET
+        if (g_avrcp_cookie == NULL) {
+            avrcp_target_callbacks_t acbs;
+
+            memset(&acbs, 0, sizeof(acbs));
+            acbs.size = sizeof(acbs);
+            acbs.received_panel_operation_cb = dm_net_avrcp_panel_cb;
+            g_avrcp_cookie = bt_avrcp_target_register_callbacks(g_bt_ins, &acbs);
+        }
+#endif
+
+#ifdef CONFIG_BLUETOOTH_A2DP_SINK
+        if (g_a2dp_cookie == NULL) {
+            a2dp_sink_callbacks_t scbs;
+
+            memset(&scbs, 0, sizeof(scbs));
+            scbs.size = sizeof(scbs);
+            scbs.audio_state_cb = dm_net_a2dp_audio_state_cb;
+            g_a2dp_cookie = bt_a2dp_sink_register_callbacks(g_bt_ins, &scbs);
+        }
+#endif
+    }
+    return g_bt_ins;
+}
+
 int dm_net_bt_start_scan(void)
 {
-    bt_instance_t *ins = dm_net_bt_get_ins();
-    adapter_callbacks_t cbs;
+    bt_instance_t *ins = dm_net_bt_ensure_ins();
 
     if (ins == NULL)
         return -1;
@@ -123,14 +284,6 @@ int dm_net_bt_start_scan(void)
     /* 状态抢跑防御（wifijianyi.md）：适配器未 ON 不允许扫描 */
     if (bt_adapter_get_state(ins) != BT_ADAPTER_STATE_ON)
         return -1;
-
-    /* 注册回调：发现结果 + 发现状态（收尾置 scan_done）+ 配对请求
-     * （其他回调保持 NULL） */
-    memset(&cbs, 0, sizeof(cbs));
-    cbs.on_discovery_result = dm_net_bt_discovery_cb;
-    cbs.on_discovery_state_changed = dm_net_bt_disc_state_cb;
-    cbs.on_pair_request     = dm_net_bt_pair_req_cb;
-    bt_adapter_register_callback(ins, &cbs);
 
     g_bt_dev_count  = 0;
     g_bt_scan_done  = 0;
@@ -185,12 +338,22 @@ void dm_net_bt_pair_reply(int accept)
 
 void dm_net_bt_set_discoverable(int on)
 {
-    bt_instance_t *ins = dm_net_bt_get_ins();
+    bt_instance_t *ins = dm_net_bt_ensure_ins();
 
     if (ins == NULL)
         return;
-    /* scan_mode: 2 = connectable+discoverable，1 = 仅 connectable */
-    bt_adapter_set_scan_mode(ins, on ? 2 : 1, on ? 120 : 0);
+    /* 第三个参数是 bondable（能否配对），不是超时。原代码传 120/0 只是
+     * 恰好被当成 true/false，语义错的；固定传 true，否则对端搜得到但配对
+     * 请求会被拒。真实状态经 on_scan_mode_changed 回到 g_bt_scan_mode。 */
+    bt_adapter_set_scan_mode(ins,
+                             on ? BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE
+                                : BT_SCAN_MODE_CONNECTABLE,
+                             true);
+}
+
+int dm_net_bt_is_discoverable(void)
+{
+    return (g_bt_scan_mode == BT_SCAN_MODE_CONNECTABLE_DISCOVERABLE);
 }
 
 /* 已配对设备缓存（wifijianyi.md：get_bonded_devices 查询结果） */
@@ -469,6 +632,26 @@ int dm_net_wifi_cur_ssid(char *buf, int buflen)
     return 0;
 }
 
+/* 2026-11-01 P330：当前 Wi-Fi 的 IPv4 地址（AI 语音配对页二维码用）。
+ * @return 0 = 已取到地址并写入 buf；-1 = 未连接/无地址 */
+int dm_net_wifi_ip(char *buf, int buflen)
+{
+    struct in_addr addr;
+
+    if (buf == NULL || buflen < 8)
+        return -1;
+    buf[0] = '\0';
+
+    memset(&addr, 0, sizeof(addr));
+    if (netlib_get_ipv4addr(WLAN0_NAME, &addr) < 0)
+        return -1;
+    if (addr.s_addr == 0)
+        return -1;
+
+    snprintf(buf, (size_t)buflen, "%s", inet_ntoa(addr));
+    return 0;
+}
+
 /* JSON 字符串转义：将 \ " \t \n \r 替换为 \\x 形式，写入 buf。
  * 返回 buf 自身，方便 fprintf 内联调用。 */
 static const char *json_escape(char *buf, size_t buflen, const char *src)
@@ -619,7 +802,7 @@ int dm_net_wifi_disconnect(void)
  * ioctl 直连驱动）路径下恒 0——驱动内部关联标志未置位，与 wifi_is_up/
  * _wifi_is_on 同款坑（P46/P47 回退教训）。改判 wlan0 是否已获得 IPv4
  * 地址（= 链路 + DHCP 真通，与 ai_agent netmgr 同源：日志 "Found iface
- * wlan0 addr 10.0.0.2 → Network connected"）。刷机开机未联网时返回 0，
+ * wlan0 addr <device-ip> → Network connected"）。刷机开机未联网时返回 0，
  * UI 提示 No WiFi；联网后自动放行，流程=先连网再语音。 */
 int dm_net_wifi_connected(void)
 {
@@ -642,26 +825,29 @@ void dm_net_wifi_set(int on)
 
 int dm_net_bt_is_on(void)
 {
-    bt_adapter_state_t st = g_bt_state;
-
+    /* socket IPC 有往返开销：每 10 次（≈5s，UI 500ms 轮询）向 bluetoothd
+     * 取一次真实状态，其余读回调维护的缓存。 */
     if (g_bt_ins && (++g_bt_tick % 10 == 0))
-        st = bt_adapter_get_state(g_bt_ins);
+        g_bt_state = bt_adapter_get_state(g_bt_ins);
 
-    return (st == BT_ADAPTER_STATE_ON || st == BT_ADAPTER_STATE_BLE_ON);
+    return (g_bt_state == BT_ADAPTER_STATE_ON ||
+            g_bt_state == BT_ADAPTER_STATE_BLE_ON);
 }
 
 void dm_net_bt_set(int on)
 {
-    if (g_bt_ins == NULL)
-        g_bt_ins = bluetooth_create_instance();
-    if (g_bt_ins == NULL)
+    bt_instance_t *ins = dm_net_bt_ensure_ins();
+
+    if (ins == NULL)
         return;
 
     if (on) {
-        bt_adapter_enable(g_bt_ins);
-        g_bt_state = BT_ADAPTER_STATE_ON;
+        /* 不开乐观状态：enable 是异步的，HCI 没起来时这里会失败，
+         * 状态由 on_adapter_state_changed 回填，UI 才不会假显示“已开启”。 */
+        bt_adapter_enable(ins);
     } else {
-        bt_adapter_disable(g_bt_ins);
+        bt_adapter_disable(ins);
         g_bt_state = BT_ADAPTER_STATE_OFF;
+        g_bt_scan_done = 1;
     }
 }

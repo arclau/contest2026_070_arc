@@ -19,6 +19,10 @@
 #include <time.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <math.h>
+
+#include "dm_res.h"      /* 资源根：板端 /resource，SIM /data/data */
+#include "dm_glass.h"    /* V1 Home / lock-screen material tokens */
 
 /* dm_kb_state_t 在 deskmate_ui.h 中声明，此处不需要完整包含（避免重复定义冲突）
  * 键盘工具函数定义在本文件，对外声明在 deskmate_ui.h */
@@ -51,6 +55,15 @@ static volatile int g_xp_state;
 #include "dm_health_cfg.h"              /* 2026-09-14：音量落盘供 AI 语音同步 */
 #include "deskmate_icons.h"
 #include "aibg.h"                       /* 2026-08-12 AI 子页品牌横幅 */
+
+/* arm64 CMake -Werror：本文件内先用后定义的符号补声明（行为不变） */
+void music_play(uint32_t id);
+void dm_audio_fg_release(void);
+void ui_home_create(void);
+void create_status_bar_ex(lv_obj_t *bar,
+                          lv_obj_t **clock_out, lv_obj_t **date_out,
+                          lv_obj_t **weather_out,
+                          lv_obj_t **wifi_out, lv_obj_t **bt_out);
 #ifdef CONFIG_LED_RGB_WS2812
 #include "lv_demo_panel_rgb_control.h"   /* board-only LED control */
 #endif
@@ -63,7 +76,10 @@ static volatile int g_xp_state;
  * 故全部封装在 dm_net.c（独立编译单元），这里只调其 API。 */
 #include "dm_net.h"
 #include "dm_pet.h"                  /* 电子宠物：音乐/语音联动 */
+#include "pet_view.h"                /* P352：ASR 失败时直接弹宠物气泡 */
+#include "pet_core.h"                /* P352：PET_BUBBLE_DURATION_TICKS */
 #include "dm_alarm.h"                /* 2026-09-10 P206：语音定闹（alarm: 命令） */
+#include "dm_health.h"               /* 2026-11-01 P333：health: 打卡命令 */
 #endif
 
 /* 网络接线（2026-08-08）：Settings WiFi/蓝牙开关回调 + 状态栏图标刷新。
@@ -157,19 +173,19 @@ static bool        ai_voice_active; /* 2026-08-12：press 真正开始录音才�
 static lv_timer_t *g_ai_auto_stop_timer; /* 2026-08-12 点按延录：快速松手后自动 stop */
 static uint32_t    ai_voice_press_ts;    /* 2026-08-12：press 时刻（lv_tick ms），判点按 vs 长按 */
 static uint32_t    ai_speaking_ts;       /* 2026-08-15 P81：进入 Speaking 时刻，超时兜底复位 */
-#define AI_SPEAKING_TIMEOUT_MS 22000     /* 2026-08-15 P81：TTS 播报最长约 19s（LLM 2s+首包 5.6s+播放 11.5s），留余量 */
+#define AI_SPEAKING_TIMEOUT_MS 60000     /* 真实 done 事件丢失时的兜底 */
 static void        ai_auto_stop_cb(lv_timer_t *t); /* 2026-08-12 点按延录到期回调（前向声明，定义在 ai_voice_release_cb 后） */
 /* P116：music 区正式定义在 1237 行（deskmate_ui.h 已 extern），
  * ai_poll_cb（125 行）提前引用需此处前向声明——deskmate_ui.c 自身不 include deskmate_ui.h */
 extern bool music_playing;
 extern bool music_inited;
 /* 2026-08-23 表驱动重构：本地设备控制命令分发（实现定义在 music 区
- * 前向声明之后，见 ai_local_cmd_dispatch——含命令表 + needs_ack 策略） */
-static void ai_local_cmd_dispatch(const char *cmd);
+ * 前向声明之后，见 dm_local_cmd_dispatch——含命令表 + needs_ack 策略） */
+int dm_local_cmd_dispatch(const char *cmd);
+void dm_tone_play(const char *name);
 
-/* 2026-08-23 review-10 音频仲裁层：前台音频（TTS 播报/提示音）挂起/恢复音乐。
- * 定义在 music 区之后（见 dm_audio_fg_acquire），此处前向声明供 PTT 按下
- * （dm_ai_voice_press_cb）、提示音（dm_tone_play）、cmd 轮询（dm_ai_cmd_poll_cb）提前引用。 */
+/* 前台音频优先：AI 录音/TTS/提示音开始前停止音乐并释放声卡。
+ * 定义在 music 区之后，供 PTT 和提示音调用。 */
 void dm_audio_fg_acquire(void);
 void dm_audio_fg_poll(void);
 
@@ -182,6 +198,7 @@ void dm_audio_fg_poll(void);
  * 原内联在 ai_poll_cb 内的 static chat_buf 上提为文件域，快问 chips 与
  * poll 共用同一缓冲，避免两处各记各的导致对话断裂。 */
 static char ai_chat_buf[AI_RESP_MAX * 3];
+#define AI_CHAT_KEEP_BYTES 1600   /* P362：对话区保留的最近字节数 */
 
 static void ai_chat_append(const char *who, const char *text)
 {
@@ -197,12 +214,19 @@ static void ai_chat_append(const char *who, const char *text)
         used += (size_t)n;
     else
         used = sizeof(ai_chat_buf) - 1;
-    /* 防累积无限增长：超限保留后半段 */
-    if (used > sizeof(ai_chat_buf) * 2 / 3)
+    /* P362：只保留最近约 1600 字节（6~8 轮）。对话区是一个整段 label，
+     * 每次追加都要整段重新测量 + 重排，freetype 逐字出图；历史留到 8KB 时
+     * 光重排就是几百毫秒，文字一上屏就卡一下。窗口一屏只显示 3~4 行，
+     * 留这么多历史没有意义。从行首切，避免半句话。 */
+    if (used > AI_CHAT_KEEP_BYTES)
         {
-            memmove(ai_chat_buf, ai_chat_buf + sizeof(ai_chat_buf) / 3,
-                sizeof(ai_chat_buf) - sizeof(ai_chat_buf) / 3);
-            ai_chat_buf[sizeof(ai_chat_buf) - sizeof(ai_chat_buf) / 3] = '\0';
+            size_t cut = used - AI_CHAT_KEEP_BYTES;
+            char  *nl  = memchr(ai_chat_buf + cut, '\n', used - cut);
+
+            if (nl)
+                cut = (size_t)(nl - ai_chat_buf) + 1;
+
+            memmove(ai_chat_buf, ai_chat_buf + cut, used - cut + 1);
         }
 }
 
@@ -216,8 +240,21 @@ static void ai_chat_refresh(void)
         LV_COORD_MAX, LV_ANIM_OFF);
 }
 
-/* 2026-09-10 快问点击：user_data = 完整问句（静态字符串，免释放）。
- * 与 PTT 同门禁（未联网拦截），busy 时拦截防 worker 顶替。 */
+/* 2026-11-02 P362：状态文字只在真的变化时才重设。
+ * lv_label_set_text 即使内容相同也会让整个 label 失效、用 freetype 逐字重排，
+ * ai_poll_cb 每 300ms 刷一次，一轮对话下来白白重绘上百次，观感上就是"卡"。 */
+static void ai_status_set(const char *text)
+{
+    if (!ai_status_lbl || !text)
+        return;
+
+    const char *cur = lv_label_get_text(ai_status_lbl);
+
+    if (cur == NULL || strcmp(cur, text) != 0)
+        lv_label_set_text(ai_status_lbl, text);
+}
+
+/* Static question strings: local time/music bypass all cloud gates. */
 static void ai_chip_click_cb(lv_event_t *e)
 {
     const char *q = (const char *)lv_event_get_user_data(e);
@@ -225,48 +262,74 @@ static void ai_chip_click_cb(lv_event_t *e)
     reset_idle_timer();   /* 交互防 idle 跳锁屏（铁律 4） */
     if (!q || q[0] == '\0')
         return;
+
+    /* Local controls must not depend on Wi-Fi or the AI worker. */
+    if (strcmp(q, "播放音乐") == 0)
+        {
+            ai_chat_append("你", q);
+            dm_local_cmd_dispatch("music:play");
+            return;
+        }
+    if (strcmp(q, "现在几点了") == 0)
+        {
+            time_t now = time(NULL);
+            time_t local_epoch = now + 8 * 3600; /* Same UTC+8 as the home clock. */
+            struct tm local;
+            char reply[64];
+            if (now <= 0 || !gmtime_r(&local_epoch, &local))
+                snprintf(reply, sizeof(reply), "请先在设置里校准时间");
+            else
+                snprintf(reply, sizeof(reply), "现在是%02d点%02d分",
+                         local.tm_hour, local.tm_min);
+            ai_chat_append("你", q);
+            ai_chat_append("维拉", reply);
+            ai_chat_refresh();
+            return;
+        }
     if (!dm_net_wifi_connected()) {
         if (ai_status_lbl)
-            lv_label_set_text(ai_status_lbl, "未连接 Wi-Fi，请先联网");
+            ai_status_set("未连接 Wi-Fi，请先联网");
         return;
     }
     if (dm_ai_busy()) {
         if (ai_status_lbl)
-            lv_label_set_text(ai_status_lbl, "思考中…");
+            ai_status_set("思考中…");
         return;
     }
     ai_chat_append("你", q);
     ai_chat_refresh();
-    /* 2026-09-10 P206 板上实锤：快问"播放音乐"走 agent 云点歌
-     * （music_search→music_play）依赖 agent 侧播放器，
-     * 板上报 AGENT_MUSIC media_player_open failed。
-     * 改走本地曲库直播（music_play，离线可用、无曲给暂无曲目），
-     * 不发 agent，回复本地回显。 */
-    if (strcmp(q, "播放音乐") == 0)
-        {
-            extern uint32_t dm_track_count;
-            extern uint32_t music_track_id;
-            music_play(music_track_id);
-            if (dm_track_count > 0)
-                ai_chat_append("AI", "正在播放本地音乐");
-            else
-                ai_chat_append("AI", "曲库是空的，把歌放到 /sdcard/music 吧");
-            ai_chat_refresh();
-            if (ai_status_lbl)
-                lv_label_set_text(ai_status_lbl, "随时待命");
-            return;
-        }
     if (ai_status_lbl)
-        lv_label_set_text(ai_status_lbl, "思考中…");
-    dm_audio_fg_acquire();   /* 与 PTT 一致：挂起音乐让路，播完自动恢复 */
+        ai_status_set("思考中…");
+    dm_audio_fg_acquire();   /* 与 PTT 一致：停止音乐，释放声卡 */
     if (dm_ai_ask(q) != 0 && ai_status_lbl)
-        lv_label_set_text(ai_status_lbl, "思考中，稍等…");
+        ai_status_set("思考中，稍等…");
 }
 
 /* 轮询 timer：worker 完成 → dm_ai_poll 取回复更新显示 */
 static void ai_poll_cb(lv_timer_t *timer)
 {
     (void)timer;
+    int phase = dm_ai_voice_evt_phase_poll();
+
+    if (phase >= 0 && ai_status_lbl)
+        {
+            if (phase == 1)
+                ai_status_set("聆听中…");
+            else if (phase == 2)
+                ai_status_set("思考中…");
+            else if (phase == 3)
+                {
+                    ai_speaking_ts = lv_tick_get();
+                    ai_status_set("播报中…");
+                }
+            else
+                {
+                    ai_speaking_ts = 0;
+                    ai_status_set(
+                        dm_net_wifi_connected() ? "随时待命"
+                                                : "未连接 Wi-Fi，请先联网");
+                }
+        }
     /* 2026-08-15 P84：消费语音事件（stt 用户话语 / llm AI 回复），
      * 追加到对话文字区（小智式"说话显字/回答显字"） */
     if (ai_chat_lbl)
@@ -277,7 +340,7 @@ static void ai_poll_cb(lv_timer_t *timer)
                                      evt_llm, sizeof(evt_llm)))
                 {
                     ai_chat_append("你", evt_stt);
-                    ai_chat_append("AI", evt_llm);
+                    ai_chat_append("维拉", evt_llm);
                     ai_chat_refresh();
                 }
         }
@@ -292,14 +355,14 @@ static void ai_poll_cb(lv_timer_t *timer)
             /* 2026-09-10 快问回显：文本链路回复只走 WEBSOCKET 通道
              * （无 TTS、无 llm 事件广播，见 agent_main/agent_loop），
              * 此处是回复上屏的唯一路径——必须显示内容，不只回状态。 */
-            ai_chat_append("AI", buf);
+            ai_chat_append("维拉", buf);
             ai_chat_refresh();
             if (ai_status_lbl)
-                lv_label_set_text(ai_status_lbl, "随时待命");
+                ai_status_set("随时待命");
         }
     else if (dm_ai_busy() && ai_status_lbl)
         {
-            lv_label_set_text(ai_status_lbl, "思考中…");
+            ai_status_set("思考中…");
         }
     /* 2026-08-15 P81：语音链路（PTT→ASR→LLM→TTS）播报完成后 agent
      * 不会回调 UI，Speaking 状态无复位路径——超时兜底复位回 Ready。
@@ -308,7 +371,7 @@ static void ai_poll_cb(lv_timer_t *timer)
              (uint32_t)(lv_tick_get() - ai_speaking_ts) > AI_SPEAKING_TIMEOUT_MS)
         {
             ai_speaking_ts = 0;
-            lv_label_set_text(ai_status_lbl,
+            ai_status_set(
                 dm_net_wifi_connected() ? "按住说话"
                                         : "未连接 Wi-Fi，请先联网");
         }
@@ -330,7 +393,7 @@ void dm_ai_voice_press_cb(lv_event_t *e)
      * （ASR/TTS 走公网 openspeech），直接文字提示并拦截录音，不再白录 */
     if (!dm_net_wifi_connected()) {
         if (ai_status_lbl)
-            lv_label_set_text(ai_status_lbl, "未连接 Wi-Fi，请先联网");
+            ai_status_set("未连接 Wi-Fi，请先联网");
         return;
     }
 
@@ -342,20 +405,19 @@ void dm_ai_voice_press_cb(lv_event_t *e)
         ai_speaking_ts = 0;
         dm_ai_voice("interrupt");
         if (ai_status_lbl)
-            lv_label_set_text(ai_status_lbl, "已打断");
+            ai_status_set("已打断");
     }
 
     ai_voice_active = true;
     ai_voice_press_ts = lv_tick_get();   /* 2026-08-12：记录按下时刻判点按/长按 */
     ai_speaking_ts = 0;                  /* 2026-08-15 P81：新一轮录音，清 Speaking 计时 */
     if (ai_status_lbl)
-        lv_label_set_text(ai_status_lbl, "聆听中…");
+        ai_status_set("聆听中…");
     /* 2026-08-16 P103：PTT 按下 → 停音乐释放声卡。XPlayer pause 只调
      * snd_vela_pcm_pause 不关 handle（PAUSE_PUSH 后 CNT 停住、ai_agent
      * TTS snd_vela_pcm_open 持续 EBUSY -16），必须 force_stop 真正释放，
      * 否则 AI 回复播报永远 playback open failed。语音优先，音乐让路。
-     * 2026-08-23 review-10：改走音频仲裁层 acquire——挂起音乐（记录待恢复），
-     * AI 播报完成（agent "done" 事件）后由 dm_audio_fg_poll 自动恢复。 */
+     * 前台音频优先：停止音乐并释放声卡；结束后由用户点击播放重新开始。 */
     dm_audio_fg_acquire();
     /* 2026-08-12 动态感（用户反馈）：按下放大 1.12x + 蓝紫阴影加深 +
      * 玻璃提亮（原按红 0xFF3B30 删除）；LV_STATE_PRESSED 样式松开自动回退 */
@@ -386,9 +448,9 @@ void dm_ai_voice_release_cb(lv_event_t *e)
         return;
     }
     ai_voice_active = false;
-    ai_speaking_ts = lv_tick_get();   /* 2026-08-15 P81：进入 Speaking，记录时刻供 poll 超时复位 */
+    ai_speaking_ts = 0;
     if (ai_status_lbl)
-        lv_label_set_text(ai_status_lbl, "播报中…");
+        ai_status_set("思考中…");
     dm_ai_voice("stop");   /* P53 方案A：结束录音 → ASR→LLM→TTS */
 }
 
@@ -398,9 +460,9 @@ static void ai_auto_stop_cb(lv_timer_t *t)
     (void)t;
     g_ai_auto_stop_timer = NULL;
     ai_voice_active = false;
-    ai_speaking_ts = lv_tick_get();   /* 2026-08-15 P81：同上 */
+    ai_speaking_ts = 0;
     if (ai_status_lbl)
-        lv_label_set_text(ai_status_lbl, "播报中…");
+        ai_status_set("思考中…");
     dm_ai_voice("stop");
 }
 
@@ -412,6 +474,7 @@ void ui_settings_close_cleanup(void);       /* ui_settings.c：close_subpage 清
 void ui_wifi_create(lv_obj_t *parent);   /* ui_wifi.c（Phase 1 拆分） */
 void ui_wifi_close_cleanup(void);        /* ui_wifi.c：close_subpage 清理 */
 void ui_bt_create(lv_obj_t *parent);     /* ui_bt.c（Phase 1 拆分） */
+void ui_ai_cfg_create(lv_obj_t *parent); /* ui_ai_cfg.c（P330 AI 语音配置） */
 
 /* ================================================================
  * DESIGN SYSTEM v1 — 8" 1920×1200 tablet (PPI ≈ 283, 1mm ≈ 11.2px)
@@ -507,12 +570,11 @@ lv_obj_t     *w_cur_temp_lbl;   /* current temp "33°C" */
 lv_obj_t     *w_cur_desc_lbl;   /* "Sunny | AQI 42" */
 lv_obj_t     *w_day_lbl[DM_WEATHER_DAYS];    /* weekday */
 lv_obj_t     *w_icon_cv[DM_WEATHER_DAYS];    /* drawn weather glyph */
-/* Canvas backing store for ARGB8888 (4 bytes/px). lv_color_t is only 3 bytes
- * in LVGL 9.1 (XRGB8888), so a lv_color_t array under-allocates: each 64×64
- * canvas needs 64*64*4 bytes but would only get 64*64*3 → lv_canvas_fill_bg
- * overflowed 4 KB per canvas, corrupting adjacent globals (board crash:
- * spec_attr garbage → Data Abort in clock_update_cb). uint32_t fixes it. */
-uint32_t     w_icon_buf[DM_WEATHER_DAYS][64 * 64];
+/* P360：w_icon_buf（画布后备存储）定义移到 ui_home.c——尺寸宏
+ * DM_WICON_SIZE 在 deskmate_ui.h 里，本文件不包含该头文件。
+ * 注意必须用 uint32_t：LVGL 9.1 的 lv_color_t 只有 3 字节，
+ * 用 lv_color_t 会少分配 1/4，lv_canvas_fill_bg 越界写坏相邻全局量
+ * （板上表现为 clock_update_cb 里 Data Abort）。 */
 lv_obj_t     *w_temp_lbl[DM_WEATHER_DAYS];   /* "36°/25°" */
 
 /* Standby / lock screen */
@@ -578,12 +640,17 @@ void init_shared_styles(void)
     if (style_card_inited) return;
     lv_style_init(&style_card);
     lv_style_set_bg_color(&style_card, lv_color_hex(COL_CARD));
-    lv_style_set_bg_opa(&style_card, LV_OPA_90);
-    lv_style_set_border_width(&style_card, 0);
-    lv_style_set_radius(&style_card, RAD_CARD);
-    lv_style_set_shadow_width(&style_card, 8);
-    lv_style_set_shadow_color(&style_card, lv_color_hex(0x000000));
-    lv_style_set_shadow_opa(&style_card, LV_OPA_10);
+    lv_style_set_bg_grad_dir(&style_card, LV_GRAD_DIR_NONE);
+    lv_style_set_bg_opa(&style_card, DM_GLASS_CARD_OPA);
+    lv_style_set_border_width(&style_card, DM_GLASS_EDGE_WIDTH);
+    lv_style_set_border_color(&style_card, lv_color_hex(0xFFFFFF));
+    lv_style_set_border_opa(&style_card, DM_GLASS_EDGE_OPA);
+    lv_style_set_radius(&style_card, DM_GLASS_RADIUS);
+    lv_style_set_shadow_width(&style_card, DM_GLASS_SHADOW_WIDTH);
+    lv_style_set_shadow_offset_x(&style_card, 0);
+    lv_style_set_shadow_offset_y(&style_card, DM_GLASS_SHADOW_Y);
+    lv_style_set_shadow_color(&style_card, lv_color_hex(DM_GLASS_SHADOW_COLOR));
+    lv_style_set_shadow_opa(&style_card, DM_GLASS_SHADOW_OPA);
     lv_style_set_pad_all(&style_card, 16);
     style_card_inited = true;
 }
@@ -835,6 +902,11 @@ void music_ui_clear_ptrs(void);
 /* Phase 1 拆分：close_subpage 被 ui_files.c（files_go_up 退出子页）extern 引用 */
 void close_subpage(void)
 {
+    /* P346：返回键"偶尔卡一下"的定位埋点——只在总耗时 ≥20ms 时打一行，
+     * 拆成"清理 / 删树 / 收尾"三段，下次上板就知道卡在哪一段。 */
+    uint32_t t0 = lv_tick_get();
+    uint32_t t_clean = 0, t_del = 0;
+
     if (subpage_overlay) {
         /* 音乐后台化（2026-08-08）：退出音乐页只关 UI，不停音乐——
          * 音乐是系统级常驻能力，XPlayer/解码线程/播放状态保留，
@@ -908,8 +980,10 @@ void close_subpage(void)
         ai_chat_lbl = NULL;
         ai_status_lbl = NULL;
         ai_voice_btn  = NULL;
+        t_clean = lv_tick_get() - t0;
         lv_obj_del(subpage_overlay);
         subpage_overlay = NULL;
+        t_del = lv_tick_get() - t0 - t_clean;
 
         if (subpage_parent) {
             /* 嵌套子页（WiFi/蓝牙）关闭 → 恢复父 overlay（Settings），
@@ -917,6 +991,9 @@ void close_subpage(void)
             subpage_overlay = subpage_parent;
             subpage_parent  = NULL;
             lv_obj_move_foreground(subpage_overlay);
+            if (t_clean + t_del >= 20)
+                LV_LOG_USER("[ui] close_subpage(nested) %ums: cleanup %ums, del %ums",
+                    (unsigned)(t_clean + t_del), (unsigned)t_clean, (unsigned)t_del);
             return;
         }
 
@@ -932,6 +1009,11 @@ void close_subpage(void)
         if (g_dock && (!standby_overlay ||
                        lv_obj_has_flag(standby_overlay, LV_OBJ_FLAG_HIDDEN)))
             lv_obj_clear_flag(g_dock, LV_OBJ_FLAG_HIDDEN);
+
+        if (lv_tick_get() - t0 >= 20)
+            LV_LOG_USER("[ui] close_subpage %ums: cleanup %ums, del %ums, tail %ums",
+                (unsigned)(lv_tick_get() - t0), (unsigned)t_clean, (unsigned)t_del,
+                (unsigned)(lv_tick_get() - t0 - t_clean - t_del));
     }
 }
 
@@ -1241,6 +1323,7 @@ void show_subpage(const char *title)
     else if (strcmp(title, "Alarm") == 0)     ui_alarm_create(content);
     else if (strcmp(title, "Datetime") == 0)  ui_datetime_create(content);
     else if (strcmp(title, "UART") == 0)      ui_uart_dbg_create(content);
+    else if (strcmp(title, "AICfg") == 0)     ui_ai_cfg_create(content);
     else {
         lv_obj_t *placeholder = lv_label_create(content);
         lv_label_set_text(placeholder, "敬请期待…");
@@ -1552,14 +1635,19 @@ void settings_add_separator(lv_obj_t *card)
 static void dm_status_icon_refresh(lv_obj_t *lbl, int st)
 {
     if (!lbl) return;
-    if (st == 2) {
-        lv_obj_clear_flag(lbl, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_text_color(lbl, lv_color_hex(COL_BLUE), 0);
-    } else if (st == 1) {
-        lv_obj_clear_flag(lbl, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_text_color(lbl, lv_color_hex(COL_SEC), 0);
-    } else {
-        lv_obj_add_flag(lbl, LV_OBJ_FLAG_HIDDEN);
+
+    bool hide = (st == 0);
+    if (lv_obj_has_flag(lbl, LV_OBJ_FLAG_HIDDEN) != hide) {
+        if (hide)
+            lv_obj_add_flag(lbl, LV_OBJ_FLAG_HIDDEN);
+        else
+            lv_obj_clear_flag(lbl, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    if (!hide) {
+        lv_color_t want = lv_color_hex(st == 2 ? COL_BLUE : COL_SEC);
+        if (!lv_color_eq(lv_obj_get_style_text_color(lbl, LV_PART_MAIN), want))
+            lv_obj_set_style_text_color(lbl, want, LV_PART_MAIN);
     }
 }
 
@@ -1571,7 +1659,7 @@ void dm_net_status_refresh(void)
      * P146：三态——已连接=蓝；未连接（含扫描失败/进行中）=灰常驻；
      * 蓝牙保持 开=蓝 / 关=隐藏 两态。
      * P148 修复：未连接误判蓝色——IP 判定（dm_net_wifi_connected）在
-     * 固件下载失败等场景下 wlan0 残留旧 IP（日志：有 10.0.0.2 但
+     * 固件下载失败等场景下 wlan0 残留旧 IP（日志：有 <device-ip> 但
      * wapi_get_essid failed、ssid=NULL not connected）→ 误报已连接。
      * 改用与 WiFi 子页「已连接 %s / 未连接网络」文本同源的 SSID 判定
      * （dm_net_wifi_cur_ssid = wifi_get_setting，日志证实未连接时正确
@@ -1758,17 +1846,17 @@ static int  music_audio_duration(int *ms);
  * 本地设备控制命令分发（2026-08-23 P115/P116 表驱动重构）
  *
  * 结构：命令表（前缀 + needs_ack 确认策略 + 执行器）顺序匹配；
- * ai_poll_cb 消费 cmd 事件 → ai_local_cmd_dispatch() 查表执行。
+ * ai_poll_cb 消费 cmd 事件 → dm_local_cmd_dispatch() 查表执行。
  * 新增命令 = 写一个执行器 + 表加一行，无需改 ai_poll_cb。
  *
- * needs_ack 策略：音量/亮度=1（执行后 TTS 播报确认，不碰 XPlayer）；
+ * needs_ack 策略：音量/亮度=1（执行后本地提示音确认，不碰 XPlayer）；
  * 音乐=0（review-5 实证：起播后 XPlayer 独占声卡，紧随的 speak 必
  * EBUSY 静默失败 = "AI 不响应"——音乐本身即反馈，不播确认）。
  * ══════════════════════════════════════════════════════════════ */
 
 struct dm_local_cmd {
     const char *prefix;              /* cmd 前缀："music:" / "volume:" 等 */
-    int  needs_ack;                  /* 1=执行后 TTS 播报确认；0=不播（音乐即反馈） */
+    int  needs_ack;                  /* 1=执行后本地提示音确认；0=不播（音乐即反馈） */
     void (*exec)(const char *arg, char *ack, size_t ack_cap);
 };
 
@@ -1789,7 +1877,8 @@ static void dm_cmd_music(const char *op, char *ack, size_t ack_cap)
                 music_resume();      /* 继续播放 */
             else
                 music_play(0);       /* 补扫曲库 + 恢复上次/第一首 */
-            snprintf(ack, ack_cap, "音乐继续播放");
+            snprintf(ack, ack_cap, "%s", dm_track_count > 0 ?
+                     "正在播放本地音乐" : "曲库是空的，把歌放到 /sdcard/music 吧");
         }
     else if (strcmp(op, "pause") == 0)
         {
@@ -1854,10 +1943,46 @@ static void dm_cmd_brightness(const char *val, char *ack, size_t ack_cap)
     snprintf(ack, ack_cap, "好的，亮度已调到 %d%%", g_screen_brightness);
 }
 
-/* pet: feed|play|name <名字>|status */
+/* pet: feed|play|name <名字>|status|walk[:秒]|sit|sleep|eat|groom|stop */
 static void dm_cmd_pet(const char *op, char *ack, size_t ack_cap)
 {
-    if (strncmp(op, "feed", 4) == 0)
+    if (strncmp(op, "walk", 4) == 0)
+    {
+        /* pet:walk 或 pet:walk:300 —— 不写时长用 5 分钟 */
+        int secs = 300;
+        const char *colon = strchr(op, ':');
+        if (colon && colon[1] >= '0' && colon[1] <= '9')
+            secs = atoi(colon + 1);
+        dm_pet_command(DM_PET_CMD_WALK, secs);
+        snprintf(ack, ack_cap, "好，我走%d分钟", (secs + 59) / 60);
+    }
+    else if (strncmp(op, "sit", 3) == 0)
+    {
+        dm_pet_command(DM_PET_CMD_SIT, 0);
+        snprintf(ack, ack_cap, "坐好了");
+    }
+    else if (strncmp(op, "sleep", 5) == 0)
+    {
+        dm_pet_command(DM_PET_CMD_SLEEP, 0);
+        snprintf(ack, ack_cap, "睡了，晚安");
+    }
+    else if (strncmp(op, "eat", 3) == 0)
+    {
+        dm_pet_command(DM_PET_CMD_EAT, 0);
+        snprintf(ack, ack_cap, "开饭啦");
+    }
+    else if (strncmp(op, "groom", 5) == 0)
+    {
+        /* P344：舔爪——复用已有的 groom_paw 动作 */
+        dm_pet_command(DM_PET_CMD_GROOM, 0);
+        snprintf(ack, ack_cap, "舔舔~");
+    }
+    else if (strncmp(op, "stop", 4) == 0)
+    {
+        dm_pet_command(DM_PET_CMD_STOP, 0);
+        snprintf(ack, ack_cap, "回来了");
+    }
+    else if (strncmp(op, "feed", 4) == 0)
     {
         /* pet:feed 鱼/肉/菜/零食 → 默认鱼 */
         dm_pet_on_event(PET_EVT_FEED_FISH);
@@ -1885,20 +2010,103 @@ static void dm_cmd_pet(const char *op, char *ack, size_t ack_cap)
         const dm_pet_data_t *pd = dm_pet_get_data();
         snprintf(ack, ack_cap,
                  "%s(猫) 饿%d 力%d 乐%d 亲%d 健%d",
-                 pd->name[0] ? pd->name : "旺财",
+                 pd->name[0] ? pd->name : "维拉",
                  pd->attrs.hunger, pd->attrs.energy, pd->attrs.happiness,
                  pd->attrs.affection, pd->attrs.health);
     }
     else
     {
-        snprintf(ack, ack_cap, "用法：pet:feed|play|name <名字>|status");
+        snprintf(ack, ack_cap, "用法：pet:feed|play|name <名字>|status|walk|sit|sleep|eat|groom|stop");
     }
 }
 
-/* alarm:HH:MM:R（agent 中文时间解析后广播，R=0 一次/1 每天） */
+/* alarm:HH:MM:R（新增） / alarm:del:HH:MM / delall / off / list / snooze
+ * 2026-11-01 P333：语音增删查。删/关/查都直接走 dm_alarm_*，不经过设置页。 */
 static void dm_cmd_alarm(const char *arg, char *ack, size_t ack_cap)
 {
     int hh = -1, mm = 0, rp = 1;
+
+    /* ── 删除指定时间 ── */
+    if (strncmp(arg, "del:", 4) == 0)
+    {
+        int n = dm_alarm_count(), i, hit = -1;
+        if (sscanf(arg + 4, "%d:%d", &hh, &mm) != 2)
+        {
+            snprintf(ack, ack_cap, "没听清删哪个闹钟");
+            return;
+        }
+        for (i = 0; i < n; i++)
+        {
+            const dm_alarm_t *a = dm_alarm_get(i);
+            if (a && a->hh == hh && a->mm == mm)
+            {
+                hit = i;
+                break;
+            }
+        }
+        if (hit < 0)
+            snprintf(ack, ack_cap, "%d点%02d分没有闹钟", hh, mm);
+        else
+        {
+            dm_alarm_del(hit);
+            snprintf(ack, ack_cap, "已删掉%d点%02d分的闹钟", hh, mm);
+        }
+        return;
+    }
+
+    /* ── 全部删除 ── */
+    if (strncmp(arg, "delall", 6) == 0)
+    {
+        int n = dm_alarm_count();
+        while (dm_alarm_count() > 0)
+            dm_alarm_del(0);
+        snprintf(ack, ack_cap, n > 0 ? "闹钟全删了" : "本来就没有闹钟");
+        return;
+    }
+
+    /* ── 全部关闭 ── */
+    if (strncmp(arg, "off", 3) == 0)
+    {
+        int n = dm_alarm_count(), i;
+        for (i = 0; i < n; i++)
+            dm_alarm_set_enabled(i, 0);
+        snprintf(ack, ack_cap, n > 0 ? "闹钟都关了" : "本来就没有闹钟");
+        return;
+    }
+
+    /* ── 查询 ── */
+    if (strncmp(arg, "list", 4) == 0)
+    {
+        int n = dm_alarm_count(), i;
+        size_t used = 0;
+        if (n == 0)
+        {
+            snprintf(ack, ack_cap, "现在没有闹钟");
+            return;
+        }
+        used = (size_t)snprintf(ack, ack_cap, "有%d个：", n);
+        for (i = 0; i < n && used + 24 < ack_cap; i++)
+        {
+            const dm_alarm_t *a = dm_alarm_get(i);
+            if (!a)
+                continue;
+            used += (size_t)snprintf(ack + used, ack_cap - used, "%d点%02d分%s%s",
+                                     a->hh, a->mm,
+                                     a->repeat ? "(每天)" : "",
+                                     a->enabled ? "" : "(已关)");
+            if (i + 1 < n && used + 3 < ack_cap)
+                used += (size_t)snprintf(ack + used, ack_cap - used, "、");
+        }
+        return;
+    }
+
+    /* ── 贪睡 ── */
+    if (strncmp(arg, "snooze", 6) == 0)
+    {
+        dm_alarm_snooze();
+        snprintf(ack, ack_cap, "再睡五分钟");
+        return;
+    }
 
     if (sscanf(arg, "%d:%d:%d", &hh, &mm, &rp) < 2 || hh < 0 || hh > 23)
         {
@@ -1909,34 +2117,141 @@ static void dm_cmd_alarm(const char *arg, char *ack, size_t ack_cap)
     if (mm > 59) mm = 59;
     if (rp != 0) rp = 1;
     if (dm_alarm_add(hh, mm, rp, 0) < 0)
-        {
-            snprintf(ack, ack_cap, "闹钟满了，先删一个吧");
-            return;
-        }
+    {
+        snprintf(ack, ack_cap, "闹钟满了，先删一个吧");
+        return;
+    }
     snprintf(ack, ack_cap, "好的，%s%02d点%02d分叫你",
              rp ? "每天" : "", hh, mm);
 }
 
+/* scene:sleep|out|home —— 一句话串多个模块（决赛演示用）。
+ * 2026-11-01 P333：音乐 + 亮度 + 宠物，三处同时动，一眼看出"系统感"。 */
+static void dm_cmd_scene(const char *op, char *ack, size_t ack_cap)
+{
+    char tmp[64] = "";
+
+    if (strncmp(op, "sleep", 5) == 0)
+    {
+        dm_cmd_music("pause", tmp, sizeof(tmp));
+        dm_cmd_brightness("20", tmp, sizeof(tmp));
+        dm_pet_command(DM_PET_CMD_SLEEP, 0);
+        snprintf(ack, ack_cap, "晚安，灯调暗了");
+    }
+    else if (strncmp(op, "out", 3) == 0)
+    {
+        dm_cmd_music("pause", tmp, sizeof(tmp));
+        dm_cmd_brightness("100", tmp, sizeof(tmp));
+        dm_pet_command(DM_PET_CMD_STOP, 0);
+        snprintf(ack, ack_cap, "出门小心");
+    }
+    else
+    {
+        dm_cmd_brightness("60", tmp, sizeof(tmp));
+        dm_pet_command(DM_PET_CMD_STOP, 0);
+        snprintf(ack, ack_cap, "欢迎回来");
+    }
+}
+
+/* health:water|stand|snooze —— 打卡是"记录动作"，会推动首页进度环与猫的反应 */
+static void dm_cmd_health(const char *op, char *ack, size_t ack_cap)
+{
+    if (strncmp(op, "water", 5) == 0)
+    {
+        dm_health_water_drank();
+        dm_pet_on_event(PET_EVT_AI_CHAT);       /* 猫开心一下 */
+        snprintf(ack, ack_cap, "记下了，今天第%d杯", dm_health_water_count());
+    }
+    else if (strncmp(op, "stand", 5) == 0)
+    {
+        dm_health_sit_stood();
+        dm_pet_on_event(PET_EVT_PRESENCE);
+        snprintf(ack, ack_cap, "起身记下了，今天第%d次", dm_health_stand_count());
+    }
+    else
+    {
+        /* 弹窗还在就顺手按"再等会"：坐着→久坐贪睡，否则→喝水贪睡 */
+        if (dm_health_is_seated())
+        {
+            dm_health_sit_snooze();
+            snprintf(ack, ack_cap, "好，过会再提醒你起来");
+        }
+        else
+        {
+            dm_health_water_snooze();
+            snprintf(ack, ack_cap, "好，过会再提醒你喝水");
+        }
+    }
+}
+
+/* app:books|calendar|uart|settings|files|music|alarm|pet|ai|wifi|bt|home
+ * 2026-11-01 P332：语音开页面。只调 show_subpage / close_subpage，
+ * 不碰各页内部状态；页面不存在时 show_subpage 的兜底分支会显示"敬请期待"。 */
+static void dm_cmd_app(const char *op, char *ack, size_t ack_cap)
+{
+    static const struct { const char *k; const char *page; const char *say; } t[] = {
+        { "books",    "Books",     "打开书本" },
+        { "calendar", "Calendar",  "打开日历" },
+        { "uart",     "UART",      "打开串口调试" },
+        { "settings", "Settings",  "打开设置" },
+        { "files",    "Files",     "打开文件" },
+        { "music",    "Music",     "打开音乐" },
+        { "alarm",    "Alarm",     "打开闹钟" },
+        { "pet",      "Pet",       "打开宠物设置" },
+        { "ai",       "AI",        "打开对话" },
+        { "wifi",     "WiFi",      "打开无线网络" },
+        { "bt",       "Bluetooth", "打开蓝牙" },
+    };
+    size_t i;
+
+    if (strncmp(op, "home", 4) == 0 || strncmp(op, "close", 5) == 0)
+        {
+            close_subpage();
+            snprintf(ack, ack_cap, "回桌面了");
+            return;
+        }
+
+    for (i = 0; i < sizeof(t) / sizeof(t[0]); i++)
+        {
+            if (strncmp(op, t[i].k, strlen(t[i].k)) == 0)
+                {
+                    show_subpage(t[i].page);
+                    snprintf(ack, ack_cap, "%s", t[i].say);
+                    return;
+                }
+        }
+    snprintf(ack, ack_cap, "没听清要打开哪个");
+}
+
 /* ── 命令表（顺序即优先级）── */
 static const struct dm_local_cmd g_dm_local_cmds[] = {
+    { "app:",        0, dm_cmd_app },
     { "music:",      0, dm_cmd_music },
     { "volume:",     1, dm_cmd_volume },
     { "brightness:", 1, dm_cmd_brightness },
     { "pet:",        0, dm_cmd_pet },
+    { "scene:",      0, dm_cmd_scene },
+    { "health:",     0, dm_cmd_health },
     { "alarm:",      1, dm_cmd_alarm },
 };
 
 /* 分发：查表匹配前缀 → 执行 + 按 needs_ack 播确认 */
-static void ai_local_cmd_dispatch(const char *cmd)
+int dm_local_cmd_dispatch(const char *cmd)
 {
     size_t i;
+
+    if (!cmd || !cmd[0])
+        return 0;
 
     for (i = 0; i < sizeof(g_dm_local_cmds) / sizeof(g_dm_local_cmds[0]); i++)
         {
             size_t plen = strlen(g_dm_local_cmds[i].prefix);
             if (strncmp(cmd, g_dm_local_cmds[i].prefix, plen) == 0)
                 {
-                    char ack[64] = "";
+                    char ack[192] = "";
+                    /* A visible acknowledgement precedes pet motion, offline. */
+                    if (strcmp(g_dm_local_cmds[i].prefix, "pet:") == 0)
+                        pet_view_show_bubble("好的", PET_BUBBLE_DURATION_TICKS);
                     g_dm_local_cmds[i].exec(cmd + plen, ack, sizeof(ack));
                     if (ack[0])
                         {
@@ -1946,14 +2261,17 @@ static void ai_local_cmd_dispatch(const char *cmd)
                             ai_chat_refresh();
                         }
                     if (g_dm_local_cmds[i].needs_ack && ack[0]) {
-                        /* review-10：音量/亮度确认播报前挂起音乐，播完恢复 */
-                        dm_audio_fg_acquire();
-                        dm_ai_voice_speak(ack);
+                        pet_view_show_bubble(ack, PET_BUBBLE_DURATION_TICKS);
+                        /* Existing local chime; never fall back to cloud TTS.
+                         * Adjusting volume must not stop ongoing music. */
+                        if (!music_playing && !ai_voice_active && !dm_ai_voice_speaking())
+                            dm_tone_play("bg_reward_std");
                     }
-                    return;
+                    return 1;
                 }
         }
     printf("[voice-cmd] unknown: %s\n", cmd);
+    return 0;
 }
 
 /* 2026-08-23 常驻化（review-7）：系统级 cmd 事件消费 timer 回调。
@@ -1964,9 +2282,17 @@ static void ai_local_cmd_dispatch(const char *cmd)
 static void dm_ai_cmd_poll_cb(lv_timer_t *t)
 {
     (void)t;
-    static char evt_cmd[64];
-    if (dm_ai_voice_evt_cmd_poll(evt_cmd, sizeof(evt_cmd)))
-        ai_local_cmd_dispatch(evt_cmd);
+    /* P363：语音事件订阅保活（连接卡在 FIN_WAIT_1 时自愈，否则宠物语音
+     * 相位/语音指令/断网气泡会静默失效）。 */
+    dm_ai_voice_evt_keepalive();
+    static char evt_cmd[64];    if (dm_ai_voice_evt_cmd_poll(evt_cmd, sizeof(evt_cmd)))
+        dm_local_cmd_dispatch(evt_cmd);
+    /* P352：ASR 失败（断网/没听清）→ 宠物气泡说一句。
+     * 原来这条路径只发 pet_idle，主屏/锁屏按完语音键等于什么都没发生，
+     * 用户只能看到猫闪一下。放在系统级 timer 里，任意界面都能看见。 */
+    static char evt_err[64];
+    if (dm_ai_voice_evt_err_poll(evt_err, sizeof(evt_err)))
+        pet_view_show_bubble(evt_err, PET_BUBBLE_DURATION_TICKS);
     /* review-10 音频仲裁：消费前台音频完成信号 → 恢复被挂起的音乐 */
     dm_audio_fg_poll();
 }
@@ -2530,6 +2856,11 @@ static int dm_sound_write(SoundCtrl *s, void *data, int size)
             }
         }
 
+        /* 诊断量当前不输出（日志已收敛），显式消费避免 -Wunused-but-set */
+        (void)do_print; (void)now_tick; (void)delta_ms;
+        (void)dbg_peak; (void)dbg_nz; (void)dbg_n;
+        (void)dbg_L_rms; (void)dbg_R_rms; (void)dbg_corr;
+
 #if defined(DM_FORCE_MONO) && DM_FORCE_MONO
         /* 强制 mono 混音实验（2026-08-07 切歌无声排查）：L/R 平均 →
          * dual mono 后写声卡。验证"外部功放单端合并处反相抵消"假设——
@@ -2797,7 +3128,7 @@ void music_audio_force_stop(void)
  * 声卡被音乐占用时 open 失败 → 跳过提示音（不打断音乐）。 */
 static pthread_t g_tone_thread;
 static volatile int g_tone_busy;
-static volatile int g_audio_tone_done;   /* review-10：提示音播完置位（主线程 poll 消费恢复音乐） */
+static volatile int g_audio_tone_done;   /* 提示音播完置位，主线程消费并清标志 */
 
 /* 播放单个提示音 wav：open → hw_params（按 wav 头）→ 写循环 → fade-out → drain → close。
  * 2026-09-01 P142：抽成独立函数，供 dm_tone_worker 顺序播放 intro/voice 两个文件
@@ -2813,7 +3144,7 @@ static int tone_play_one(const char *name)
     FILE *fp;
     int ret;
 
-    snprintf(path, sizeof(path), "/resource/tones/%s.wav", name);
+    snprintf(path, sizeof(path), DM_RES_ROOT "/tones/%s.wav", name);
 
     fp = fopen(path, "rb");
     if (!fp)
@@ -3007,7 +3338,7 @@ void dm_tone_play(const char *name)
      * P107 实证 pause 不释放句柄）时先停音乐释放声卡，否则提示音
      * open 必 EBUSY 静默跳过，健康提醒完全无声（对齐 PTT 行为）。
      * 本函数由 LVGL 主线程调用（弹窗/欢迎语），操作音乐状态安全。
-     * 2026-08-23 review-10：改走音频仲裁层 acquire，提示音播完自动恢复音乐。 */
+     * 提示音播放前停止音乐，结束后不自动恢复。 */
     dm_audio_fg_acquire();
     copy = strdup(name);
     if (!copy)
@@ -3290,63 +3621,25 @@ void music_album_next(bool next)
     music_play(music_track_id);
 }
 
-/* ── 2026-08-23 review-10 音频仲裁层（治本）────────────────────────
- * 统一"停音乐→释放声卡→播 TTS/提示音→恢复音乐"，根治 P103/P107/
- * review-5 反复发作的抢声卡（EBUSY）问题。
- *
- * 模型：前台音频（agent TTS 播报 / 本地提示音）需要声卡时调
- * dm_audio_fg_acquire() 挂起音乐（播放中才记录待恢复 + force_stop
- * 释放声卡）；播完由 dm_audio_fg_poll()（300ms LVGL 主线程）消费完成
- * 信号（提示音 worker 置 g_audio_tone_done / agent "done" 事件经
- * dm_ai_voice_evt_done_poll）调 dm_audio_fg_release() 恢复。
- *
- * 关键事实（P107/review-5 实证）：
- *   - XPlayerPause 只 snd_vela_pcm_pause 不关 handle，暂停仍占声卡；
- *   - XPlayerStop → PlayerClear 清空媒体+关 sink 才真正释放声卡，但
- *     此后处于 STOPPED 态，XPlayerStart 无法续播 → 恢复必须整曲重播
- *     （music_play 内部 destroy 旧 player 重建）。
- *   - 挂起超时（无完成信号，如 PTT 空文本未触发 speak）放弃恢复，
- *     避免音乐在很久后突然复活。 */
-#define DM_AUDIO_FG_RESUME_WINDOW_MS  30000   /* 挂起后 30s 内完成才恢复 */
-
-static int      g_audio_music_resume;      /* 1 = 音乐被前台音频挂起待恢复 */
-static uint32_t g_audio_suspend_ms;        /* 挂起时刻（lv_tick） */
+/* 前台音频（AI 录音/TTS/本地提示音）优先使用独占声卡。
+ * XPlayerPause 只暂停输出，仍持有 hw:audiocodec；必须 XPlayerStop 才能
+ * 让录音和 TTS 打开设备。停止后保持用户可见的停止状态，不自动恢复；
+ * 用户再点播放时由 music_play() 重建播放器并从当前歌曲开头播放。 */
 
 void dm_audio_fg_acquire(void)
 {
-    /* 播放中才记录待恢复；暂停的音乐保持停止（用户意图）。 */
-    if (music_playing) {
-        g_audio_music_resume = 1;
-        g_audio_suspend_ms = lv_tick_get();
-    }
-    /* 播放/暂停都持有声卡（P107），统一 force_stop 释放；无音乐时
-     * music_pause() 判空无害，XPlayerStop 有 g_xplayer 判空。 */
     music_audio_force_stop();
 }
 
 void dm_audio_fg_release(void)
 {
-    if (!g_audio_music_resume)
-        return;
-    g_audio_music_resume = 0;
-    /* 超时放弃恢复（无完成信号场景），避免音乐迟到复活 */
-    if ((uint32_t)(lv_tick_get() - g_audio_suspend_ms) > DM_AUDIO_FG_RESUME_WINDOW_MS)
-        return;
-    if (music_inited && dm_track_count > 0 && !music_playing)
-        music_play(music_track_id);
 }
 
 void dm_audio_fg_poll(void)
 {
-    int done = 0;
-    if (g_audio_tone_done) {
+    if (g_audio_tone_done)
         g_audio_tone_done = 0;
-        done = 1;
-    }
-    if (dm_ai_voice_evt_done_poll())
-        done = 1;
-    if (done)
-        dm_audio_fg_release();
+    (void)dm_ai_voice_evt_done_poll();
 }
 
 /* Phase 1 拆分：music_update_track_info 被 ui_music.c（ui_music_create 初始化）extern 调用 */
@@ -3509,8 +3802,8 @@ static void create_ai_subpage(lv_obj_t *parent)
      * 2026-08-12：初始值按网络状态显示（未连 WiFi 直接提示联网）
      * 2026-08-15 P85：定位在按钮正下方（按钮底部 + 间距）。 */
     ai_status_lbl = lv_label_create(parent);
-    lv_label_set_text(ai_status_lbl,
-        dm_net_wifi_connected() ? "按住说话" : "未连接 Wi-Fi，请先联网");
+    ai_status_set(
+        dm_net_wifi_connected() ? "按住说话" : "语音需联网，本地按钮可离线");
     lv_obj_set_style_text_font(ai_status_lbl, FONT_LABEL, 0);
     lv_obj_set_style_text_color(ai_status_lbl, lv_color_hex(COL_SEC), 0);
     /* P86：align 延迟到函数末尾统一执行 */
@@ -3523,8 +3816,6 @@ static void create_ai_subpage(lv_obj_t *parent)
      * 内读取野 children → 崩溃）；②align 延迟到函数末尾统一执行。 */
     lv_obj_t *chat_cont = lv_obj_create(parent);
     lv_obj_set_width(chat_cont, 1920 * 70 / 100);
-    /* 2026-09-10 快问行：高度 DM(210)→DM(180)，腾出底部一行放 4 快问
-     * chips（顶 180 底 612，chips 中心 648，按钮顶部 689 不碰）。 */
     lv_obj_set_height(chat_cont, DM(180));
     lv_obj_set_style_radius(chat_cont, RAD_CARD, 0);
     lv_obj_set_style_bg_color(chat_cont, lv_color_hex(COL_CARD), 0);
@@ -3645,7 +3936,7 @@ static void create_ai_subpage(lv_obj_t *parent)
  * create_app_dock 已整体搬至 ui/ui_home.c（ui_home_create） */
 
 /* ================================================================
-/* Phase 1 拆分：STANDBY 区（idle_timer_cb / wake_from_standby /
+ * Phase 1 拆分：STANDBY 区（idle_timer_cb / wake_from_standby /
  * standby_click_cb / arc_opa_anim_cb / show_standby）已整体搬至
  * ui/ui_home.c（ui_home_create），此处分段删除残留 */
 
@@ -3691,6 +3982,57 @@ static void dm_sysmon_style_cb(lv_timer_t *t)
     lv_timer_delete(t);
 }
 
+#if defined(CONFIG_BLUETOOTH_AVRCP_TARGET) || defined(CONFIG_BLUETOOTH_A2DP_SINK)
+/* 手机端蓝牙音乐（P300）：AVRCP 遥控命令 + A2DP 推流状态都在这里落地。
+ * bluetoothd 回调只置标志，这里在 LVGL 线程执行。独立常驻 timer——
+ * music_timer 在暂停时会 lv_timer_pause，暂停态下收不到手机发来的"播放"，
+ * 故不能挂在 music_timer 上。 */
+static void dm_avrcp_poll_cb(lv_timer_t *t)
+{
+    int cmd = dm_net_bt_avrcp_take();
+    static int yielded;   /* 本次推流已让路（避免每 200ms 反复 force_stop） */
+
+    (void)t;
+
+    /* 手机推流期间本地曲库让路。注意 hw:audiocodec 是独占的
+     * （ksnd_pcm_open: ref_count != 0 直接 -EBUSY），只暂停不够——
+     * XPlayer 暂停仍握着 substream，必须 Stop 真正释放。 */
+    if (dm_net_bt_a2dp_streaming()) {
+        if (!yielded) {
+            yielded = 1;
+            if (music_inited && !g_music_player_cleared)
+                music_audio_force_stop();
+        }
+        return;
+    }
+
+    if (yielded) {
+        yielded = 0;   /* 推流结束，恢复本地可播（下次播放会重建 player） */
+    }
+
+    if (cmd == DM_AVRCP_CMD_NONE)
+        return;
+
+    reset_idle_timer();   /* 手机操作也算交互，防 idle 到期跳锁屏 */
+
+    if (cmd == DM_AVRCP_CMD_PLAY) {
+        if (!music_playing) {
+            if (music_inited)
+                music_resume();
+            else
+                music_play(music_track_id);
+        }
+    } else if (cmd == DM_AVRCP_CMD_PAUSE) {
+        if (music_playing)
+            music_pause();
+    } else if (cmd == DM_AVRCP_CMD_NEXT) {
+        music_album_next(true);
+    } else if (cmd == DM_AVRCP_CMD_PREV) {
+        music_album_next(false);
+    }
+}
+#endif
+
 void deskmate_ui_create(void)
 {
     ui_home_create();
@@ -3706,4 +4048,9 @@ void deskmate_ui_create(void)
     lv_timer_t *cmd_timer = lv_timer_create(dm_ai_cmd_poll_cb, 300, NULL);
     if (cmd_timer)
         lv_timer_set_repeat_count(cmd_timer, -1);
+#if defined(CONFIG_BLUETOOTH_AVRCP_TARGET) || defined(CONFIG_BLUETOOTH_A2DP_SINK)
+    lv_timer_t *avrcp_timer = lv_timer_create(dm_avrcp_poll_cb, 200, NULL);
+    if (avrcp_timer)
+        lv_timer_set_repeat_count(avrcp_timer, -1);
+#endif
 }

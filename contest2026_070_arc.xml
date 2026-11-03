@@ -10,9 +10,46 @@
 
   <project path="contest2026_070_arc" name="contest2026_070_arc">
     <!-- R528 DesktopMate：桌面宠物 + AI 语音（2026-09-09 映射方案定稿） -->
-    <linkfile src="r528/luncher_dm" dest="vendor/allwinnertech/apps/luncher_dm"/>
-    <linkfile src="r528/deskmate" dest="vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/deskmate"/>
+    <!-- 上游已有 apps/luncher_dm 非空目录；应用源码按 README 构建步骤覆盖。 -->
+    <copyfile src="r528/deskmate/defconfig" dest="vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/deskmate/defconfig"/>
+    <copyfile src="r528/lvgl/lvgl.mk" dest="apps/graphics/lvgl/lvgl/lvgl.mk"/>
     <linkfile src="r528/res_tones" dest="vendor/allwinnertech/lichee/board/common/data/res/tones"/>
+    <!-- AI Agent 冻结改动：上游已有 packages/ai_agent，逐文件覆盖已跟踪文件并加入新文件。 -->
+    <copyfile src="r528/ai_agent/CMakeLists.txt" dest="packages/ai_agent/CMakeLists.txt"/>
+    <copyfile src="r528/ai_agent/Makefile" dest="packages/ai_agent/Makefile"/>
+    <copyfile src="r528/ai_agent/README.md" dest="packages/ai_agent/README.md"/>
+    <copyfile src="r528/ai_agent/agent_skills/templates/USER.md" dest="packages/ai_agent/agent_skills/templates/USER.md"/>
+    <copyfile src="r528/ai_agent/include/agent_config.h" dest="packages/ai_agent/include/agent_config.h"/>
+    <copyfile src="r528/ai_agent/include/llm/llm_cache.h" dest="packages/ai_agent/include/llm/llm_cache.h"/>
+    <copyfile src="r528/ai_agent/include/voice/audio_playback.h" dest="packages/ai_agent/include/voice/audio_playback.h"/>
+    <copyfile src="r528/ai_agent/include/voice/xiaomi_asr.h" dest="packages/ai_agent/include/voice/xiaomi_asr.h"/>
+    <copyfile src="r528/ai_agent/include/voice/xiaomi_tts.h" dest="packages/ai_agent/include/voice/xiaomi_tts.h"/>
+    <copyfile src="r528/ai_agent/src/agent_main.c" dest="packages/ai_agent/src/agent_main.c"/>
+    <copyfile src="r528/ai_agent/src/channels/cmd_llm.c" dest="packages/ai_agent/src/channels/cmd_llm.c"/>
+    <copyfile src="r528/ai_agent/src/channels/cmd_voice.c" dest="packages/ai_agent/src/channels/cmd_voice.c"/>
+    <copyfile src="r528/ai_agent/src/channels/cmd_voice.h" dest="packages/ai_agent/src/channels/cmd_voice.h"/>
+    <copyfile src="r528/ai_agent/src/channels/nsh_commands.c" dest="packages/ai_agent/src/channels/nsh_commands.c"/>
+    <copyfile src="r528/ai_agent/src/channels/ws_server.c" dest="packages/ai_agent/src/channels/ws_server.c"/>
+    <copyfile src="r528/ai_agent/src/core/agent_loop.c" dest="packages/ai_agent/src/core/agent_loop.c"/>
+    <copyfile src="r528/ai_agent/src/core/context_builder.c" dest="packages/ai_agent/src/core/context_builder.c"/>
+    <copyfile src="r528/ai_agent/src/core/context_builder.h" dest="packages/ai_agent/src/core/context_builder.h"/>
+    <copyfile src="r528/ai_agent/src/core/memory_store.c" dest="packages/ai_agent/src/core/memory_store.c"/>
+    <copyfile src="r528/ai_agent/src/core/message_bus.h" dest="packages/ai_agent/src/core/message_bus.h"/>
+    <copyfile src="r528/ai_agent/src/infra/pair_server.c" dest="packages/ai_agent/src/infra/pair_server.c"/>
+    <copyfile src="r528/ai_agent/src/infra/pair_server.h" dest="packages/ai_agent/src/infra/pair_server.h"/>
+    <copyfile src="r528/ai_agent/src/infra/vela_tls.c" dest="packages/ai_agent/src/infra/vela_tls.c"/>
+    <copyfile src="r528/ai_agent/src/infra/vela_tls.h" dest="packages/ai_agent/src/infra/vela_tls.h"/>
+    <copyfile src="r528/ai_agent/src/llm/llm_cache.c" dest="packages/ai_agent/src/llm/llm_cache.c"/>
+    <copyfile src="r528/ai_agent/src/llm/llm_proxy.c" dest="packages/ai_agent/src/llm/llm_proxy.c"/>
+    <copyfile src="r528/ai_agent/src/llm/llm_proxy.h" dest="packages/ai_agent/src/llm/llm_proxy.h"/>
+    <copyfile src="r528/ai_agent/src/llm/llm_router.c" dest="packages/ai_agent/src/llm/llm_router.c"/>
+    <copyfile src="r528/ai_agent/src/voice/audio_playback.c" dest="packages/ai_agent/src/voice/audio_playback.c"/>
+    <copyfile src="r528/ai_agent/src/voice/voice_asr.c" dest="packages/ai_agent/src/voice/voice_asr.c"/>
+    <copyfile src="r528/ai_agent/src/voice/voice_channel.c" dest="packages/ai_agent/src/voice/voice_channel.c"/>
+    <copyfile src="r528/ai_agent/src/voice/voice_channel.h" dest="packages/ai_agent/src/voice/voice_channel.h"/>
+    <copyfile src="r528/ai_agent/src/voice/voice_tts.c" dest="packages/ai_agent/src/voice/voice_tts.c"/>
+    <copyfile src="r528/ai_agent/src/voice/xiaomi_asr.c" dest="packages/ai_agent/src/voice/xiaomi_asr.c"/>
+    <copyfile src="r528/ai_agent/src/voice/xiaomi_tts.c" dest="packages/ai_agent/src/voice/xiaomi_tts.c"/>
     <!-- 驱动源码镜像：新增走 linkfile，改动上游文件走 copyfile（linkfile 无法覆盖上游已跟踪文件） -->
     <!-- 新增（上游不存在，linkfile 映射；apps/gt9271_touch_test 为整目录） -->
     <linkfile src="r528/vendor_drivers/apps/gt9271_touch_test" dest="vendor/allwinnertech/apps/gt9271_touch_test"/>
@@ -21,9 +58,22 @@
     <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.c"/>
     <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.h" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1200x1920.h"/>
     <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/BOE_1200x1920_mipi_config.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/BOE_1200x1920_mipi_config.c"/>
+    <linkfile src="r528/vendor_drivers/boards/r528/drivers/hx83102_iic_touch.c" dest="vendor/allwinnertech/boards/r528/drivers/hx83102_iic_touch.c"/>
+    <linkfile src="r528/vendor_drivers/boards/r528/drivers/hx83102_iic_touch.h" dest="vendor/allwinnertech/boards/r528/drivers/hx83102_iic_touch.h"/>
+    <linkfile src="r528/vendor_drivers/boards/r528/drivers/hx83102_firmware.c" dest="vendor/allwinnertech/boards/r528/drivers/hx83102_firmware.c"/>
+    <linkfile src="r528/vendor_drivers/boards/r528/drivers/gen_hx83102_fw.sh" dest="vendor/allwinnertech/boards/r528/drivers/gen_hx83102_fw.sh"/>
+    <linkfile src="r528/vendor_drivers/boards/r528/drivers/hx83102_port.md" dest="vendor/allwinnertech/boards/r528/drivers/hx83102_port.md"/>
+    <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1440x720.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1440x720.c"/>
+    <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1440x720.h" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1440x720.h"/>
+    <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1440x720_port.md" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1440x720_port.md"/>
+    <linkfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/BOE_1440x720_mipi_config.c" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/BOE_1440x720_mipi_config.c"/>
+    <copyfile src="r528/vendor_drivers/chips/r528/drivers/rtos-hal/hal/source/disp2/CMakeLists.txt" dest="vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/CMakeLists.txt"/>
+    <copyfile src="r528/nsh/defconfig" dest="vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/nsh/defconfig"/>
     <!-- 改动（覆盖上游已跟踪文件，copyfile；增量重 sync 需加 force-sync 参数） -->
     <copyfile src="r528/vendor_drivers/boards/r528/drivers/Kconfig" dest="vendor/allwinnertech/boards/r528/drivers/Kconfig"/>
     <copyfile src="r528/vendor_drivers/boards/r528/r528s3-gemini-s1/src/Makefile" dest="vendor/allwinnertech/boards/r528/r528s3-gemini-s1/src/Makefile"/>
+    <copyfile src="r528/vendor_drivers/boards/r528/r528s3-gemini-s1/src/etc/init.d/rcS.nsh" dest="vendor/allwinnertech/boards/r528/r528s3-gemini-s1/src/etc/init.d/rcS.nsh"/>
+    <copyfile src="r528/vendor_drivers/boards/r528/r528s3-gemini-s1/configs/bootloader/defconfig" dest="vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/bootloader/defconfig"/>
     <copyfile src="r528/vendor_drivers/boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_conf.c" dest="vendor/allwinnertech/boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_conf.c"/>
     <copyfile src="r528/vendor_drivers/boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_util.c" dest="vendor/allwinnertech/boards/r528/drivers/realtek_ieee80211/api/wifi/wifi_util.c"/>
     <copyfile src="r528/vendor_drivers/boards/r528/drivers/realtek_ieee80211/os/customer_rtos/customer_rtos_service.c" dest="vendor/allwinnertech/boards/r528/drivers/realtek_ieee80211/os/customer_rtos/customer_rtos_service.c"/>

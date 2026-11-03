@@ -76,7 +76,7 @@ typedef struct
     int   since_ai_s;       /* 距最近 AI 对话 */
     int   decline_cnt;      /* 连续拒绝提醒次数（"继续坐/先不喝"） */
     int   budget[CAT_LAST]; /* 各分类今日已用计数 */
-    int   recent_ids[8];    /* 最近播放 wav 轻量 id（环形，防重复） */
+    const char *recent_ids[8]; /* 最近播放 wav 名（与 g_recent_ids 同型；arm64 指针 8 字节） */
     bool  music_playing;
     bool  ai_busy;
     int   hour;             /* 当前小时 0~23 */
