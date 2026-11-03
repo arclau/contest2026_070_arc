@@ -140,7 +140,7 @@ function getFallbackAuthor() {
   }
   const ssh = getAuthorFromSshPubkey();
   if (ssh) return ssh;
-  return { name: "contest-collector", email: "contest-collector@auto-commit.local" };
+  return { name: "contest-collector", email: "contest-collector@example.com" };
 }
 
 function loadRedactRules(logRoot) {
