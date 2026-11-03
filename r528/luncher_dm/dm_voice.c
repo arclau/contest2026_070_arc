@@ -436,12 +436,11 @@ void voice_director_on_seated(void)
 
     if (d.action >= VOICE_PARTICLE && d.wav)
     {
-        /* 2026-09-01 P142：开机欢迎语（greeting 类）前置"心之容器"背景
-         * 音乐，避免突然人声惊吓；其余分类（粒子/关心等）保持原样。 */
-        if (d.category == CAT_GREETING)
-            dm_tone_play_seq("bg_reward_heart", d.wav);
-        else
-            dm_tone_play(d.wav);
+        /* P359：所有感应触发的播报都先给提示音，再出人声——否则在安静的
+         * 房间里突然有人说话会吓一跳（用户实测反馈）。原来只有 greeting
+         * 分类有前导音，粒子/关心/调侃是裸 wav 直接开口。 */
+        dm_tone_play_seq(d.category == CAT_GREETING
+                         ? "bg_reward_heart" : "bg_reward_std", d.wav);
         voice_director_note_played(d.category, d.wav);
     }
     /* VOICE_UI_ONLY / VOICE_NONE：欢迎回来卡由 ui_home（Step 4）处理 */

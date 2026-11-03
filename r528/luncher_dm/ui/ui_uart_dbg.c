@@ -130,7 +130,7 @@ static void uart_dbg_feed(const uint8_t *buf, int n)
         /* ── HEX 模式：每行16字节 hex + ASCII 预览 ── */
         for (int i = 0; i < n; i++) {
             if (uart_dbg_hex_off == 0) {
-                ti += snprintf(tmp + ti, sizeof(tmp) - ti, "%08lX: ", uart_dbg_hex_addr);
+                ti += snprintf(tmp + ti, sizeof(tmp) - ti, "%08lX: ", (unsigned long)uart_dbg_hex_addr);
             }
             ti += snprintf(tmp + ti, sizeof(tmp) - ti, "%02X ", buf[i]);
             uart_dbg_hex_off++;

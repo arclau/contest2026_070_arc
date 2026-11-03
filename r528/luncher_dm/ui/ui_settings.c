@@ -24,7 +24,7 @@
 
 #include "deskmate_ui.h"
 #include "dm_net.h"                    /* WiFi/蓝牙开关回调 + 初始状态查询 */
-#include "dm_city.h"                   /* 2026-09-10 A 方案：城市设置（天气城市级定位，默认惠州） */
+#include "dm_city.h"                   /* 2026-09-10 A 方案：城市设置（天气城市级定位，默认北京） */
 #include "dm_weather.h"                /* 2026-09-10 P211：日期与时间行自动/手动值 */
 #include "dm_health_cfg.h"             /* 夜览/自动亮度开关持久化（/data/dm_health.cfg） */
 #include "dm_als.h"                    /* P180：自动亮度开关（lux 驱动，夜览让位） */
@@ -258,7 +258,7 @@ static void settings_bt_row_open_cb(lv_event_t *e)
 /* ═══════════ 城市（2026-09-10 A 方案）═══════════
  * 板无 GPS，天气只需城市精度：点按循环切换（autolock 同款交互），
  * 落盘 weather_city_idx；一切换立即踢一轮天气 fetch，首页卡即刻刷新，
- * ai_agent 下次问天气读同一城市的落盘数据。默认惠州。 */
+ * ai_agent 下次问天气读同一城市的落盘数据。默认北京。 */
 static void settings_city_cb(lv_event_t *e)
 {
     lv_obj_t *row = lv_event_get_target(e);
@@ -304,8 +304,16 @@ static void settings_alarm_row_open_cb(lv_event_t *e)
     show_subpage("Alarm");
 }
 
-/* ═══════════ 宠物入口（2026-09-10 P206：独立 Pet 子页，WiFi 同款） ═══════════ */
+/* ═══════════ AI 语音（2026-11-01 P330：小米 MiMo 服务 + 扫码配 Key） ═══════════ */
 
+static void settings_ai_row_open_cb(lv_event_t *e)
+{
+    (void)e;
+    LV_LOG_USER("AI voice row clicked!");
+    show_subpage("AICfg");
+}
+
+/* ═══════════ 宠物入口（2026-09-10 P206：独立 Pet 子页，WiFi 同款） ═══════════ */
 static void settings_pet_row_open_cb(lv_event_t *e)
 {
     (void)e;
@@ -372,6 +380,14 @@ void ui_settings_create(lv_obj_t *parent)
     settings_row_slider(snd, LV_SYMBOL_VOLUME_MAX, COL_RED, "音量",
                         g_music_volume, settings_volume_cb);
 
+    /* ═══════ AI VOICE（P330）═══════ */
+    settings_section_label(parent, "AI 语音");
+    lv_obj_t *aig = settings_group_card(parent);
+    lv_obj_t *ai_row = settings_row_value(aig, LV_SYMBOL_AUDIO, COL_PURPLE,
+                                          "语音助手", "小米 MiMo", true);
+    lv_obj_add_event_cb(ai_row, settings_ai_row_open_cb,
+                        LV_EVENT_CLICKED, NULL);
+
     /* ═══════ GENERAL ═══════ */
     settings_section_label(parent, "通用");
     lv_obj_t *gen = settings_group_card(parent);
@@ -390,7 +406,7 @@ void ui_settings_create(lv_obj_t *parent)
     lv_obj_add_event_cb(alarm_row, settings_alarm_row_open_cb,
                         LV_EVENT_CLICKED, NULL);
     settings_add_separator(gen);
-    /* 2026-09-10 城市（天气定位用，默认惠州；点按循环切换） */
+    /* 2026-09-10 城市（天气定位用，默认北京；点按循环切换） */
     lv_obj_t *city_row = settings_row_value(gen, LV_SYMBOL_HOME, COL_GREEN,
                                             "城市", dm_city_cur()->name,
                                             true);
@@ -410,7 +426,7 @@ void ui_settings_create(lv_obj_t *parent)
     lv_obj_t *pet = settings_group_card(parent);
     /* 2026-09-10 P206：整区搬 Pet 嵌套子页（WiFi/蓝牙同款），本页只留一行入口 */
     const dm_pet_data_t *pet_pd = dm_pet_get_data();
-    const char *pet_entry_name = (pet_pd && pet_pd->name[0]) ? pet_pd->name : "旺财";
+    const char *pet_entry_name = (pet_pd && pet_pd->name[0]) ? pet_pd->name : "维拉";
     lv_obj_t *pet_row = settings_row_value(pet, LV_SYMBOL_IMAGE, COL_GREEN,
                                            "宠物", pet_entry_name, true);
     lv_obj_add_event_cb(pet_row, settings_pet_row_open_cb, LV_EVENT_CLICKED, NULL);

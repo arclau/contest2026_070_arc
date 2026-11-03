@@ -26,6 +26,7 @@
 #include <lvgl/lvgl.h>
 
 #include "deskmate_ui.h"
+#include "dm_res.h"
 
 /* 前向声明（原 deskmate_ui.c 顶部同款；函数定义在下方） */
 static void files_scan_dir(const char *path);
@@ -1098,7 +1099,7 @@ static void files_dialog_show(const char *msg, void (*ok_cb)(void))
  * 及其子目录禁止删除/移入/粘入（防删固件字体与系统配置） */
 static int files_is_protected(const char *path)
 {
-    static const char *roots[] = { "/resource", "/etc", "/proc", "/sys", "/dev" };
+    static const char *roots[] = { DM_RES_ROOT, "/etc", "/proc", "/sys", "/dev" };
     if (!path || !path[0])
         return 1;
     /* 去尾部 '/'（"/" 本体保留） */

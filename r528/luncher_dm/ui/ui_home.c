@@ -15,11 +15,14 @@
  */
 
 #include <stdio.h>
+#include <string.h>
+#include <math.h>
 #include <time.h>
 #include <pthread.h>
 #include <lvgl/lvgl.h>
 
 #include "deskmate_ui.h"
+#include "dm_glass.h"
 #include "dm_weather.h"
 #include "dm_net.h"   /* P113：dm_net_wifi_connected（WiFi 连上立即拉天气） */
 #include "deskmate_icons.h"
@@ -34,6 +37,16 @@
 /* 前向声明（launch_app_after_fade 引用 show_standby；show_standby 定义靠后） */
 static void show_standby(void);
 static void home_health_rings_refresh(void);    /* P103：HOME 健康卡双小圈刷新 */
+
+/* lv_label_set_text() always invalidates and reallocates, even for equal text.
+ * Clock labels live on three surfaces and otherwise redraw every second. */
+static void clock_label_set_if_changed(lv_obj_t *label, const char *text)
+{
+    if (!label || !text) return;
+    const char *cur = lv_label_get_text(label);
+    if (cur == NULL || strcmp(cur, text) != 0)
+        lv_label_set_text(label, text);
+}
 
 /* ================================================================
  * CLOCK UPDATE CALLBACK（1s 系统 timer，2026-08-09 从 deskmate_ui.c 搬入）
@@ -56,13 +69,11 @@ void clock_update_cb(lv_timer_t *timer)
 
     /* Time HH:MM — P145：hero 大时钟已移除，时间只在各状态栏左上角 */
     snprintf(buf, sizeof(buf), "%02d:%02d", tm.tm_hour, tm.tm_min);
-    lv_label_set_text(clock_label, buf);
+    clock_label_set_if_changed(clock_label, buf);
     /* 2026-08-10 子页状态栏时钟（show_subpage 创建，关闭前置空） */
-    if (subpage_clock_lbl)
-        lv_label_set_text(subpage_clock_lbl, buf);
+    clock_label_set_if_changed(subpage_clock_lbl, buf);
     /* 2026-08-10 锁屏状态栏时钟（show_standby 创建） */
-    if (standby_bar_clock_lbl)
-        lv_label_set_text(standby_bar_clock_lbl, buf);
+    clock_label_set_if_changed(standby_bar_clock_lbl, buf);
 
     /* Date: 周日 8月28日（2026-08-28 巡检汉化：原 Sun/Aug 英文星期+月） */
     static const char *cn_weekdays[] =
@@ -74,11 +85,9 @@ void clock_update_cb(lv_timer_t *timer)
              cn_weekdays[tm.tm_wday],
              cn_months[tm.tm_mon],
              tm.tm_mday);
-    lv_label_set_text(clock_date_label, buf);
-    if (subpage_date_lbl)
-        lv_label_set_text(subpage_date_lbl, buf);
-    if (standby_bar_date_lbl)
-        lv_label_set_text(standby_bar_date_lbl, buf);
+    clock_label_set_if_changed(clock_date_label, buf);
+    clock_label_set_if_changed(subpage_date_lbl, buf);
+    clock_label_set_if_changed(standby_bar_date_lbl, buf);
 
     /* 网络状态图标（2026-08-08 接线驱动，每秒刷新一次） */
     dm_net_status_refresh();
@@ -300,116 +309,397 @@ static lv_obj_t *create_card(lv_obj_t *parent, lv_coord_t w, lv_coord_t h)
 }
 
 /* ================================================================
- * WEATHER GLYPH — hand-drawn icons on a 64×64 canvas
- * (sun / cloud / rain / storm / snow / fog), inspired by
- * cyd-weather-station's custom glyphs. No font dependency.
+ * WEATHER GLYPH — 手绘天气图标（DM_WICON_SIZE² 画布，ARGB8888）
+ *
+ * P360：原来的 64×64 图标只有一团灰云，缩在卡片里又小又没颜色
+ * （用户原话"破图标""改好看一点有颜色一点的"）。现在：
+ *   - 画布 64 → 96，卡片内占比 38% → 57%，细节画得出来；
+ *   - 按天气分色：晴=琥珀、云=蓝灰渐变、雨=宝石蓝、雪=冰蓝、
+ *     雷暴=紫云+金黄闪电、雾=灰蓝；
+ *   - 圆/线/多边形都做覆盖度抗锯齿 + alpha 叠加，去掉硬边锯齿；
+ *   - 云走"上亮下暗"渐变 + 柔和投影，多云画成太阳被云遮住一半。
+ *
+ * 仍是纯代码绘制：不占 res 分区、不引外部图片、不增加解码耗时。
+ * 只在建卡与天气刷新（2h）时重绘，不在渲染热路径上。
  * ================================================================ */
 
-#define WCV_SIZE 64
+/* 画布后备存储（ARGB8888，4 B/px）。必须 uint32_t：LVGL 9.1 的
+ * lv_color_t 只有 3 字节，用它会少分配 1/4，lv_canvas_fill_bg 越界写坏
+ * 相邻全局量（板上表现为 clock_update_cb 里 Data Abort）。 */
+uint32_t w_icon_buf[DM_WEATHER_DAYS][DM_WICON_SIZE * DM_WICON_SIZE];
 
-static void cv_px(lv_obj_t *cv, int x, int y, uint32_t color)
+#define WCV_SIZE DM_WICON_SIZE
+
+/* 0xAARRGGBB，与 LV_COLOR_FORMAT_ARGB8888 的内存布局一致 */
+#define WCV_RGB(r, g, b) \
+    (0xFF000000u | ((uint32_t)(r) << 16) | ((uint32_t)(g) << 8) | (uint32_t)(b))
+
+static uint32_t wcv_lerp(uint32_t a, uint32_t b, int t)   /* t: 0..255 */
 {
-    lv_canvas_set_px(cv, x, y, lv_color_hex(color), LV_OPA_COVER);
+    int ar = (int)((a >> 16) & 0xFF), ag = (int)((a >> 8) & 0xFF), ab = (int)(a & 0xFF);
+    int br = (int)((b >> 16) & 0xFF), bg = (int)((b >> 8) & 0xFF), bb = (int)(b & 0xFF);
+
+    return 0xFF000000u
+           | ((uint32_t)(ar + (br - ar) * t / 255) << 16)
+           | ((uint32_t)(ag + (bg - ag) * t / 255) << 8)
+           | (uint32_t)(ab + (bb - ab) * t / 255);
 }
 
-static void cv_fill_circle(lv_obj_t *cv, int cx, int cy, int r, uint32_t color)
+/* alpha 叠加：a=255 直接覆盖，其余按 source-over 合成到已有像素上 */
+static void wcv_put(uint32_t *buf, int x, int y, uint32_t rgb, int a)
 {
-    for (int dy = -r; dy <= r; dy++)
-        for (int dx = -r; dx <= r; dx++)
-            if (dx * dx + dy * dy <= r * r)
-                cv_px(cv, cx + dx, cy + dy, color);
-}
+    if (x < 0 || y < 0 || x >= WCV_SIZE || y >= WCV_SIZE || a <= 0)
+        return;
 
-static void cv_line(lv_obj_t *cv, int x0, int y0, int x1, int y1, uint32_t color)
-{
-    int dx = x1 > x0 ? x1 - x0 : x0 - x1;
-    int dy = y1 > y0 ? y1 - y0 : y0 - y1;
-    int sx = x0 < x1 ? 1 : -1;
-    int sy = y0 < y1 ? 1 : -1;
-    int err = dx - dy;
-    while (1)
+    uint32_t *p = &buf[(y * WCV_SIZE) + x];
+
+    if (a >= 255)
         {
-            cv_px(cv, x0, y0, color);
-            if (x0 == x1 && y0 == y1)
-                break;
-            int e2 = 2 * err;
-            if (e2 > -dy) { err -= dy; x0 += sx; }
-            if (e2 < dx)  { err += dx; y0 += sy; }
+            *p = 0xFF000000u | (rgb & 0x00FFFFFFu);
+            return;
+        }
+
+    uint32_t d  = *p;
+    int      da = (int)(d >> 24);
+    int      ra = a + da * (255 - a) / 255;
+
+    if (ra <= 0)
+        {
+            *p = 0;
+            return;
+        }
+
+    int k1 = a * 255 / ra;   /* 源权重 */
+    int k2 = 255 - k1;       /* 底权重 */
+    int r  = (((int)((rgb >> 16) & 0xFF) * k1) + ((int)((d >> 16) & 0xFF) * k2)) / 255;
+    int g  = (((int)((rgb >> 8) & 0xFF) * k1) + ((int)((d >> 8) & 0xFF) * k2)) / 255;
+    int b  = (((int)(rgb & 0xFF) * k1) + ((int)(d & 0xFF) * k2)) / 255;
+
+    *p = ((uint32_t)ra << 24) | ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+}
+
+/* 圆覆盖率：边缘 1px 线性过渡 */
+static float wcv_cov_circle(int x, int y, float cx, float cy, float r)
+{
+    float dx = (float)x - cx;
+    float dy = (float)y - cy;
+    float c  = r + 0.5f - sqrtf(dx * dx + dy * dy);
+
+    return c <= 0.0f ? 0.0f : (c >= 1.0f ? 1.0f : c);
+}
+
+/* 圆角矩形覆盖率（云的平底用它，圆并集画不出直边） */
+static float wcv_cov_rrect(int x, int y, float x0, float y0, float x1, float y1, float rr)
+{
+    float qx = fabsf((float)x - (x0 + x1) * 0.5f) - ((x1 - x0) * 0.5f - rr);
+    float qy = fabsf((float)y - (y0 + y1) * 0.5f) - ((y1 - y0) * 0.5f - rr);
+    float d  = (qx > 0.0f && qy > 0.0f) ? sqrtf(qx * qx + qy * qy) - rr
+                                        : fmaxf(qx, qy) - rr;
+    float c  = 0.5f - d;
+
+    return c <= 0.0f ? 0.0f : (c >= 1.0f ? 1.0f : c);
+}
+
+/* 竖向渐变实心圆（太阳本体） */
+static void wcv_disc(uint32_t *buf, float cx, float cy, float r,
+                     uint32_t top, uint32_t bot)
+{
+    for (int y = (int)(cy - r) - 1; y <= (int)(cy + r) + 1; y++)
+        for (int x = (int)(cx - r) - 1; x <= (int)(cx + r) + 1; x++)
+            {
+                float c = wcv_cov_circle(x, y, cx, cy, r);
+                if (c <= 0.0f)
+                    continue;
+
+                int t = (int)(((float)y - (cy - r)) * 255.0f / (2.0f * r));
+                if (t < 0) t = 0;
+                if (t > 255) t = 255;
+
+                wcv_put(buf, x, y, wcv_lerp(top, bot, t), (int)(c * 255.0f));
+            }
+}
+
+/* 环形光晕：alpha 从内到外由 a0 衰减到 a1 */
+static void wcv_ring(uint32_t *buf, float cx, float cy, float r0, float r1,
+                     uint32_t rgb, int a0, int a1)
+{
+    for (int y = (int)(cy - r1) - 1; y <= (int)(cy + r1) + 1; y++)
+        for (int x = (int)(cx - r1) - 1; x <= (int)(cx + r1) + 1; x++)
+            {
+                float dx = (float)x - cx;
+                float dy = (float)y - cy;
+                float d  = sqrtf(dx * dx + dy * dy);
+                if (d < r0 - 0.5f || d > r1 + 0.5f)
+                    continue;
+
+                float t = (d - r0) / (r1 - r0);
+                if (t < 0.0f) t = 0.0f;
+                if (t > 1.0f) t = 1.0f;
+
+                float edge = fminf(1.0f, fminf(d - (r0 - 0.5f), (r1 + 0.5f) - d));
+                float fa   = (float)a0 + ((float)a1 - (float)a0) * t;
+
+                wcv_put(buf, x, y, rgb, (int)(fa * edge));
+            }
+}
+
+/* 圆头粗线：按点到线段的距离做抗锯齿，w 为线宽 */
+static void wcv_stroke(uint32_t *buf, float x0, float y0, float x1, float y1,
+                       float w, uint32_t rgb, int a)
+{
+    float hw = w * 0.5f;
+    float vx = x1 - x0, vy = y1 - y0;
+    float l2 = vx * vx + vy * vy;
+
+    int bx0 = (int)(fminf(x0, x1) - hw) - 1;
+    int bx1 = (int)(fmaxf(x0, x1) + hw) + 1;
+    int by0 = (int)(fminf(y0, y1) - hw) - 1;
+    int by1 = (int)(fmaxf(y0, y1) + hw) + 1;
+
+    for (int y = by0; y <= by1; y++)
+        for (int x = bx0; x <= bx1; x++)
+            {
+                float wx = (float)x - x0, wy = (float)y - y0;
+                float t  = l2 > 0.0f ? (wx * vx + wy * vy) / l2 : 0.0f;
+                if (t < 0.0f) t = 0.0f;
+                if (t > 1.0f) t = 1.0f;
+
+                float dx = wx - t * vx, dy = wy - t * vy;
+                float c  = hw + 0.5f - sqrtf(dx * dx + dy * dy);
+                if (c <= 0.0f)
+                    continue;
+                if (c > 1.0f)
+                    c = 1.0f;
+
+                wcv_put(buf, x, y, rgb, (int)(c * (float)a));
+            }
+}
+
+/* 云朵轮廓：3 个圆（左右/顶部鼓包）+ 圆角矩形（平底）取并集 */
+static float wcv_cloud_cov(int x, int y, float ox, float oy)
+{
+    static const float k_lobe[3][3] = {
+        { 30.0f, 60.0f, 15.0f },
+        { 48.0f, 45.0f, 22.0f },
+        { 67.0f, 60.0f, 15.0f },
+    };
+
+    float c = wcv_cov_rrect(x, y, 20.0f + ox, 55.0f + oy, 77.0f + ox, 77.0f + oy, 9.0f);
+
+    for (int i = 0; i < 3; i++)
+        {
+            float v = wcv_cov_circle(x, y, k_lobe[i][0] + ox, k_lobe[i][1] + oy, k_lobe[i][2]);
+            if (v > c)
+                c = v;
+        }
+
+    return c;
+}
+
+/* 云：top→bot 竖向渐变，opa 为整体不透明度，shadow=1 画柔和投影 */
+static void wcv_cloud(uint32_t *buf, float ox, float oy, uint32_t top, uint32_t bot,
+                      int opa, int shadow)
+{
+    if (shadow)
+        {
+            for (int y = (int)(23.0f + oy); y <= (int)(84.0f + oy); y++)
+                for (int x = (int)(15.0f + ox); x <= (int)(82.0f + ox); x++)
+                    {
+                        float c = wcv_cloud_cov(x, y, ox, oy + 5.0f);
+                        if (c > 0.0f)
+                            wcv_put(buf, x, y, WCV_RGB(0x44, 0x5A, 0x78),
+                                    (int)(c * 52.0f));
+                    }
+        }
+
+    for (int y = (int)(23.0f + oy) - 1; y <= (int)(77.0f + oy) + 1; y++)
+        for (int x = (int)(15.0f + ox) - 1; x <= (int)(82.0f + ox) + 1; x++)
+            {
+                float c = wcv_cloud_cov(x, y, ox, oy);
+                if (c <= 0.0f)
+                    continue;
+
+                int t = (int)(((float)y - (23.0f + oy)) * 255.0f / 54.0f);
+                if (t < 0) t = 0;
+                if (t > 255) t = 255;
+
+                wcv_put(buf, x, y, wcv_lerp(top, bot, t), (int)(c * (float)opa));
+            }
+}
+
+/* 太阳：外发光两圈 + 8 根光芒 + 渐变本体（rays=0 只画本体） */
+static void wcv_sun(uint32_t *buf, float cx, float cy, float r, int rays)
+{
+    wcv_ring(buf, cx, cy, r + 1.0f, r + 6.0f,  WCV_RGB(0xFF, 0xC2, 0x4A), 52, 8);
+    wcv_ring(buf, cx, cy, r + 6.0f, r + 12.0f, WCV_RGB(0xFF, 0xC2, 0x4A), 16, 0);
+
+    if (rays)
+        {
+            for (int i = 0; i < 8; i++)
+                {
+                    float a = (float)i * 0.7853982f;   /* pi/4 */
+                    float c = cosf(a), s = sinf(a);
+
+                    wcv_stroke(buf,
+                               cx + c * (r + 5.0f), cy + s * (r + 5.0f),
+                               cx + c * (r + 13.0f), cy + s * (r + 13.0f),
+                               5.0f, WCV_RGB(0xFF, 0xB0, 0x1F), 235);
+                }
+        }
+
+    wcv_disc(buf, cx, cy, r, WCV_RGB(0xFF, 0xDA, 0x62), WCV_RGB(0xFF, 0x92, 0x00));
+}
+
+/* 雨丝：深蓝主体 + 浅蓝高光，斜向左下 */
+static void wcv_rain(uint32_t *buf, int n, float ytop, float len)
+{
+    float gap = 44.0f / (float)(n - 1);
+
+    for (int i = 0; i < n; i++)
+        {
+            float x = 28.0f + gap * (float)i;
+
+            wcv_stroke(buf, x, ytop, x - 4.0f, ytop + len, 5.5f,
+                       WCV_RGB(0x1E, 0x8C, 0xE8), 235);
+            wcv_stroke(buf, x - 0.7f, ytop + 1.0f, x - 4.0f, ytop + len - 1.0f, 2.0f,
+                       WCV_RGB(0x9A, 0xDC, 0xFF), 210);
         }
 }
 
-static void cv_cloud(lv_obj_t *cv, int cy, uint32_t color)
+/* 雪花：3 条 60° 交叉的辐条 + 每根两撇短枝 + 白色核心 */
+static void wcv_flake(uint32_t *buf, float cx, float cy, float r)
 {
-    cv_fill_circle(cv, 22, cy, 9, color);
-    cv_fill_circle(cv, 32, cy - 6, 12, color);
-    cv_fill_circle(cv, 42, cy, 9, color);
+    for (int i = 0; i < 3; i++)
+        {
+            float a = (float)i * 1.0471976f;   /* pi/3 */
+            float c = cosf(a), s = sinf(a);
+
+            wcv_stroke(buf, cx - c * r, cy - s * r, cx + c * r, cy + s * r, 3.0f,
+                       WCV_RGB(0x4F, 0xC3, 0xF7), 245);
+
+            /* 短枝：沿辐条 60% 处斜出 45°，雪花的标志性形状 */
+            float bx = cx + c * r * 0.6f, by = cy + s * r * 0.6f;
+            for (int k = -1; k <= 1; k += 2)
+                {
+                    float ba = a + (float)k * 0.7853982f;
+                    wcv_stroke(buf, bx, by, bx + cosf(ba) * r * 0.42f,
+                               by + sinf(ba) * r * 0.42f, 2.2f,
+                               WCV_RGB(0x4F, 0xC3, 0xF7), 235);
+                }
+        }
+
+    wcv_disc(buf, cx, cy, 2.0f, WCV_RGB(0xFF, 0xFF, 0xFF), WCV_RGB(0xDC, 0xF6, 0xFF));
 }
 
-static void draw_weather_glyph(lv_obj_t *cv, int code)
+/* 凸多边形填充：4×4 超采样求覆盖率（闪电用） */
+static void wcv_poly(uint32_t *buf, const float *px, const float *py, int n,
+                     uint32_t rgb, int a)
 {
-    lv_canvas_fill_bg(cv, lv_color_hex(0x000000), LV_OPA_TRANSP);
+    float x0 = px[0], x1 = px[0], y0 = py[0], y1 = py[0];
+
+    for (int i = 1; i < n; i++)
+        {
+            if (px[i] < x0) x0 = px[i];
+            if (px[i] > x1) x1 = px[i];
+            if (py[i] < y0) y0 = py[i];
+            if (py[i] > y1) y1 = py[i];
+        }
+
+    for (int y = (int)y0; y <= (int)y1 + 1; y++)
+        for (int x = (int)x0; x <= (int)x1 + 1; x++)
+            {
+                int hit = 0;
+
+                for (int sy = 0; sy < 4; sy++)
+                    for (int sx = 0; sx < 4; sx++)
+                        {
+                            float fx = (float)x + ((float)sx + 0.5f) * 0.25f;
+                            float fy = (float)y + ((float)sy + 0.5f) * 0.25f;
+                            int   in = 0;
+
+                            for (int i = 0, j = n - 1; i < n; j = i++)
+                                {
+                                    if (((py[i] > fy) != (py[j] > fy)) &&
+                                        (fx < (px[j] - px[i]) * (fy - py[i])
+                                                  / (py[j] - py[i]) + px[i]))
+                                        in = !in;
+                                }
+
+                            hit += in;
+                        }
+
+                if (hit)
+                    wcv_put(buf, x, y, rgb, (int)((float)hit * (float)a / 16.0f));
+            }
+}
+
+/* WMO 4677 天气码 → 图形。
+ * 注意判定顺序：71..77/85/86 同时落在 51..82 的雨区间里，旧代码把雪分支
+ * 放在雨后面，雪永远画不出来（一直显示成雨）。这里先判雪再判雨。 */
+static void draw_weather_glyph(uint32_t *buf, int code)
+{
+    memset(buf, 0, (size_t)WCV_SIZE * WCV_SIZE * 4u);
 
     if (code == 0)
         {
-            /* Sun: disc + 8 rays */
-            cv_fill_circle(cv, 32, 32, 13, 0xFF9500);
-            for (int i = 0; i < 8; i++)
-                {
-                    int dx0, dy0, dx1, dy1;
-                    switch (i)
-                        {
-                        case 0: dx0 = 18; dy0 = 0;  dx1 = 27; dy1 = 0;  break;
-                        case 1: dx0 = 13; dy0 = 13; dx1 = 19; dy1 = 19; break;
-                        case 2: dx0 = 0;  dy0 = 18; dx1 = 0;  dy1 = 27; break;
-                        case 3: dx0 = -13;dy0 = 13; dx1 = -19;dy1 = 19; break;
-                        case 4: dx0 = -18;dy0 = 0;  dx1 = -27;dy1 = 0;  break;
-                        case 5: dx0 = -13;dy0 = -13;dx1 = -19;dy1 = -19;break;
-                        case 6: dx0 = 0;  dy0 = -18;dx1 = 0;  dy1 = -27;break;
-                        default:dx0 = 13; dy0 = -13;dx1 = 19; dy1 = -19;break;
-                        }
-                    cv_line(cv, 32 + dx0, 32 + dy0, 32 + dx1, 32 + dy1, 0xFF9500);
-                }
+            wcv_sun(buf, 48.0f, 48.0f, 18.0f, 1);
         }
-    else if (code >= 1 && code <= 3)
+    else if (code == 1 || code == 2)
         {
-            /* Cloudy */
-            cv_cloud(cv, 38, 0xC7C7CC);
+            /* 多云：太阳从云后露出左上角 */
+            wcv_sun(buf, 36.0f, 34.0f, 13.0f, 1);
+            wcv_cloud(buf, 4.0f, 12.0f,
+                      WCV_RGB(0xF4, 0xF9, 0xFF), WCV_RGB(0xA8, 0xBE, 0xD8), 255, 1);
+        }
+    else if (code == 3)
+        {
+            /* 阴天：一前一后两层云，后层压得更浅更高，才看得出层次 */
+            wcv_cloud(buf, -13.0f, -17.0f,
+                      WCV_RGB(0xF9, 0xFC, 0xFF), WCV_RGB(0xD3, 0xE2, 0xF2), 255, 0);
+            wcv_cloud(buf, 7.0f, 10.0f,
+                      WCV_RGB(0xD6, 0xE3, 0xF4), WCV_RGB(0x88, 0x9E, 0xBC), 255, 1);
         }
     else if (code == 45 || code == 48)
         {
-            /* Fog: cloud + flat lines */
-            cv_cloud(cv, 36, 0xB0B0B8);
-            cv_line(cv, 16, 50, 48, 50, 0x8E8E93);
-            cv_line(cv, 22, 56, 44, 56, 0x8E8E93);
+            /* 雾：云 + 三条渐弱的横线 */
+            wcv_cloud(buf, 0.0f, -18.0f,
+                      WCV_RGB(0xE8, 0xEF, 0xF8), WCV_RGB(0xA6, 0xB8, 0xCC), 255, 1);
+            wcv_stroke(buf, 18.0f, 70.0f, 78.0f, 70.0f, 4.0f, WCV_RGB(0x8C, 0xA2, 0xBB), 210);
+            wcv_stroke(buf, 24.0f, 79.0f, 72.0f, 79.0f, 4.0f, WCV_RGB(0x9F, 0xB3, 0xC9), 180);
+            wcv_stroke(buf, 30.0f, 88.0f, 66.0f, 88.0f, 4.0f, WCV_RGB(0xB2, 0xC4, 0xD6), 140);
         }
-    else if (code >= 51 && code <= 82)
+    else if ((code >= 71 && code <= 77) || code == 85 || code == 86)
         {
-            /* Rain: cloud + drops */
-            cv_cloud(cv, 36, 0xC7C7CC);
-            for (int i = 0; i < 4; i++)
-                {
-                    int x = 18 + i * 9;
-                    cv_line(cv, x, 48, x - 4, 58, 0x007AFF);
-                }
+            /* 雪：冰蓝云 + 三片雪花 */
+            wcv_cloud(buf, 0.0f, -16.0f,
+                      WCV_RGB(0xE6, 0xF1, 0xFC), WCV_RGB(0x9F, 0xB8, 0xD2), 255, 1);
+            wcv_flake(buf, 28.0f, 73.0f, 8.5f);
+            wcv_flake(buf, 48.0f, 85.0f, 8.5f);
+            wcv_flake(buf, 68.0f, 73.0f, 8.5f);
         }
     else if (code >= 95)
         {
-            /* Storm: cloud + bolt */
-            cv_cloud(cv, 36, 0xC7C7CC);
-            cv_line(cv, 30, 44, 36, 52, 0xFFCC00);
-            cv_line(cv, 36, 52, 30, 56, 0xFFCC00);
-            cv_line(cv, 30, 56, 38, 60, 0xFFCC00);
+            /* 雷暴：紫云 + 金黄闪电 */
+            static const float bx[7] = { 52.0f, 39.0f, 48.0f, 43.0f, 63.0f, 52.0f, 61.0f };
+            static const float by[7] = { 58.0f, 79.0f, 79.0f, 93.0f, 69.0f, 69.0f, 58.0f };
+
+            wcv_cloud(buf, 0.0f, -18.0f,
+                      WCV_RGB(0xC9, 0xC2, 0xF0), WCV_RGB(0x6B, 0x5C, 0xA8), 255, 1);
+            wcv_poly(buf, bx, by, 7, WCV_RGB(0xFF, 0xC4, 0x1E), 255);
         }
-    else if (code >= 71 && code <= 86)
+    else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82))
         {
-            /* Snow: cloud + flakes */
-            cv_cloud(cv, 36, 0xC7C7CC);
-            for (int i = 0; i < 3; i++)
-                cv_fill_circle(cv, 20 + i * 12, 52, 2, 0x5AC8FA);
+            /* 雨：毛毛雨短、阵雨长 */
+            int light = (code >= 51 && code <= 57);
+
+            wcv_cloud(buf, 0.0f, -16.0f,
+                      WCV_RGB(0xE2, 0xEC, 0xF9), WCV_RGB(0x93, 0xAA, 0xC6), 255, 1);
+            wcv_rain(buf, 3, light ? 68.0f : 66.0f, light ? 12.0f : 20.0f);
         }
     else
         {
-            cv_cloud(cv, 38, 0xC7C7CC);
+            wcv_cloud(buf, 0.0f, 0.0f,
+                      WCV_RGB(0xEF, 0xF5, 0xFC), WCV_RGB(0xA2, 0xB6, 0xCE), 255, 1);
         }
 }
 
@@ -487,7 +777,7 @@ static void create_weather_card(lv_obj_t *card)
         lv_obj_set_size(w_icon_cv[i], WCV_SIZE, WCV_SIZE);
         lv_canvas_set_buffer(w_icon_cv[i], w_icon_buf[i],
                              WCV_SIZE, WCV_SIZE, LV_COLOR_FORMAT_ARGB8888);
-        draw_weather_glyph(w_icon_cv[i], 3);
+        draw_weather_glyph(w_icon_buf[i], 3);
 
         w_temp_lbl[i] = lv_label_create(tile);
         lv_label_set_text(w_temp_lbl[i], "--\xc2\xb0/--\xc2\xb0");
@@ -573,24 +863,23 @@ static void weather_update_cb(lv_timer_t *timer)
     if (g_weather_busy)
         return;
 
-    /* 尚未有结果：发起 fetch，30s 后回来检查 */
+    /* 尚未有结果：发起 fetch，短轮询以便完成后立即更新卡片。 */
     if (!g_weather_done)
         {
             weather_kick_fetch();
             if (timer)
-                lv_timer_set_period(timer, 30000);
+                lv_timer_set_period(timer, 1000);
             return;
         }
 
-    /* 上一轮失败：30s 快速重试（开机 WiFi 未就绪时首次必失败，
-     * 联网后应立即拉到真数据） */
+    /* 首次请求常早于 Wi-Fi 就绪；未联网时等待联网边沿触发请求。 */
     if (!g_weather_ok)
         {
-            /* 2026-08-10：失败 30s 快速重试（开机 WiFi 未就绪时首次必失败，
-             * 联网后应立即拉到真数据）；UI 不再显示 debug 信息。 */
-            weather_kick_fetch();
+            int connected = dm_net_wifi_connected();
+            if (connected)
+                weather_kick_fetch();
             if (timer)
-                lv_timer_set_period(timer, 30000);
+                lv_timer_set_period(timer, connected ? 5000 : 1000);
             return;
         }
 
@@ -614,7 +903,9 @@ static void weather_update_cb(lv_timer_t *timer)
         if (wd < 0 || wd > 6)
             wd = 0;
         lv_label_set_text(w_day_lbl[i], wdays[wd]);
-        draw_weather_glyph(w_icon_cv[i], g_weather.days[i].code);
+        /* P360：直接写画布缓冲再失效，省掉逐像素 lv_canvas_set_px 调用 */
+        draw_weather_glyph(w_icon_buf[i], g_weather.days[i].code);
+        lv_obj_invalidate(w_icon_cv[i]);
         lv_label_set_text_fmt(w_temp_lbl[i], "%d\xc2\xb0 / %d\xc2\xb0",
                               g_weather.days[i].tmax,
                               g_weather.days[i].tmin);
@@ -1349,7 +1640,7 @@ static void dark_popup_trigger_cb(void)
         /* 懒创建（2026-09-14 统一 Liquid Glass 弹窗语言）。
          * 旧太阳图标用 FONT_ICON(MiSans) 填 FA 字形 U+F185——字库无此字形不渲染，
          * 改 LV_SYMBOL_WARNING(FONT_SYMBOL=fa-solid 保证渲染) 琥珀警示。 */
-        dark_popup = dm_popup_card(lv_scr_act(), DM(500));
+        dark_popup = dm_popup_card(lv_scr_act(), DM(260));
 
         dm_popup_icon(dark_popup, LV_SYMBOL_WARNING, COL_ORANGE);
         dm_popup_title(dark_popup, "光线有点暗");
@@ -1460,8 +1751,8 @@ static void show_standby(void)
     /* ── First-time creation ── */
     standby_overlay = lv_obj_create(scr);
     lv_obj_set_size(standby_overlay, sw, sh);
-    lv_obj_set_style_bg_color(standby_overlay, lv_color_hex(COL_BG), 0);
-    lv_obj_set_style_bg_opa(standby_overlay, LV_OPA_COVER, 0);
+    dm_glass_apply_wash(standby_overlay);
+    dm_glass_apply_wallpaper(standby_overlay, sw, sh);
     lv_obj_set_style_border_width(standby_overlay, 0, 0);
     lv_obj_set_style_radius(standby_overlay, 0, 0);
     lv_obj_set_style_pad_all(standby_overlay, 0, 0);
@@ -1482,13 +1773,8 @@ static void show_standby(void)
      * Liquid Glass 样式同健康卡体系；初始隐藏，welcome_card_show 显示。 */
     standby_welcome_card = lv_obj_create(standby_overlay);
     lv_obj_set_size(standby_welcome_card, DM(760), DM(88));
-    lv_obj_set_style_bg_color(standby_welcome_card, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_bg_opa(standby_welcome_card, LV_OPA_30, 0);
-    lv_obj_set_style_border_width(standby_welcome_card, 0, 0);
+    dm_glass_apply_panel(standby_welcome_card);
     lv_obj_set_style_radius(standby_welcome_card, DM(44), 0);
-    lv_obj_set_style_shadow_width(standby_welcome_card, DM(16), 0);
-    lv_obj_set_style_shadow_color(standby_welcome_card, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_shadow_opa(standby_welcome_card, LV_OPA_20, 0);
     lv_obj_align(standby_welcome_card, LV_ALIGN_BOTTOM_MID, 0, -DM(350));
     lv_obj_add_flag(standby_welcome_card, LV_OBJ_FLAG_HIDDEN);
     standby_welcome_lbl = lv_label_create(standby_welcome_card);
@@ -1548,14 +1834,7 @@ static void show_standby(void)
      * 尺寸：DM(160)×DM(170) 防锁屏纵向溢出（固定内容 ≤1200px） */
     lv_obj_t *w_cont = make_clean_cont(rings_row);
     lv_obj_set_size(w_cont, DM(160), DM(170));
-    lv_obj_set_style_bg_color(w_cont, lv_color_hex(COL_CARD), 0);
-    lv_obj_set_style_bg_opa(w_cont, LV_OPA_60, 0);          /* 半透明白底 */
-    lv_obj_set_style_border_color(w_cont, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_border_width(w_cont, 3, 0);            /* 半透明白边 */
-    lv_obj_set_style_border_opa(w_cont, LV_OPA_50, 0);
-    lv_obj_set_style_shadow_width(w_cont, 20, 0);           /* 柔和阴影 */
-    lv_obj_set_style_shadow_opa(w_cont, LV_OPA_40, 0);
-    lv_obj_set_style_radius(w_cont, RAD_CARD, 0);
+    dm_glass_apply_panel(w_cont);
     lv_obj_set_flex_flow(w_cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(w_cont, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -1592,14 +1871,7 @@ static void show_standby(void)
     /* 久坐圈（右）——Liquid Glass 玻璃圆底 */
     lv_obj_t *s_cont = make_clean_cont(rings_row);
     lv_obj_set_size(s_cont, DM(160), DM(170));
-    lv_obj_set_style_bg_color(s_cont, lv_color_hex(COL_CARD), 0);
-    lv_obj_set_style_bg_opa(s_cont, LV_OPA_60, 0);
-    lv_obj_set_style_border_color(s_cont, lv_color_hex(0xFFFFFF), 0);
-    lv_obj_set_style_border_width(s_cont, 3, 0);
-    lv_obj_set_style_border_opa(s_cont, LV_OPA_50, 0);
-    lv_obj_set_style_shadow_width(s_cont, 20, 0);
-    lv_obj_set_style_shadow_opa(s_cont, LV_OPA_40, 0);
-    lv_obj_set_style_radius(s_cont, RAD_CARD, 0);
+    dm_glass_apply_panel(s_cont);
     lv_obj_set_flex_flow(s_cont, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(s_cont, LV_FLEX_ALIGN_CENTER,
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -1723,11 +1995,6 @@ static void show_standby(void)
     /* Override style_card padding — content needs room for 3× FONT_BODY rows */
     lv_obj_set_style_pad_all(health, 12, 0);
     lv_obj_set_style_pad_top(health, 16, 0);
-    /* P103：卡片边缘蓝色光晕（对齐播放按钮发光语言），覆盖 style_card
-     * 的黑色淡影——与双圈/音乐钮统一 Liquid Glass 光晕手法 */
-    lv_obj_set_style_shadow_width(health, 12, 0);
-    lv_obj_set_style_shadow_color(health, lv_color_hex(COL_BLUE), 0);
-    lv_obj_set_style_shadow_opa(health, LV_OPA_20, 0);
     lv_obj_set_scrollbar_mode(health, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag(health, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(health, LV_OBJ_FLAG_CLICKABLE);
@@ -1827,10 +2094,8 @@ void ui_home_create(void)
     lv_coord_t sh = lv_disp_get_ver_res(lv_disp_get_default());
 
     /* Screen background */
-    lv_obj_set_style_bg_color(scr, lv_color_hex(COL_BG), 0);
-    lv_obj_set_style_bg_grad_color(scr, lv_color_hex(COL_BG_GRAD), 0);
-    lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_VER, 0);
-    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+    dm_glass_apply_wash(scr);
+    dm_glass_apply_wallpaper(scr, sw, sh);
     lv_obj_set_style_pad_all(scr, 0, 0);
     lv_obj_set_scrollbar_mode(scr, LV_SCROLLBAR_MODE_OFF);
     lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
@@ -1932,7 +2197,7 @@ void ui_home_create(void)
      * polls result flags every 30s on failure / 4h on success (P113),
      * and a WiFi connect edge also kicks an immediate fetch. */
     weather_update_cb(NULL);
-    lv_timer_t *w_timer = lv_timer_create(weather_update_cb, 30000, NULL);
+    lv_timer_t *w_timer = lv_timer_create(weather_update_cb, 1000, NULL);
     if (w_timer) lv_timer_set_repeat_count(w_timer, -1);
 
     /* Idle timer (g_idle_timeout → standby) */

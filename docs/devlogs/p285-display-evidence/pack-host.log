@@ -1,0 +1,199 @@
+== [1/2] 编译 deskmate ==
+LIBCLANG_PATH set to: /data/dm/prebuilts/rust/linux/extra_libs
+including vendor/infineon/boards/aurix/build/vendorsetup.sh
+including vendor/infineon/boards/aurix_tc3/build/vendorsetup.sh
+including vendor/openvela/boards/build/vendorsetup.sh
+Build command line:
+  /data/dm/nuttx/tools/configure.sh -e /data/dm/vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/deskmate
+  make -C /data/dm/nuttx EXTRAFLAGS=-Wno-cpp -Wno-deprecated-declarations -j16
+  make -C /data/dm/nuttx savedefconfig
+No configuration change.
+make: Entering directory '/data/dm/nuttx'
+[1KCC:  misc/lib_utsname.c [1K[1KIN: libs/libc/libc.a -> staging/libc.a [1K[1KCPP:  /data/dm/nuttx/../vendor/allwinnertech/boards/r528/r528s3-gemini-s1/scripts/sdram.ld.S-> /data/dm/nuttx/../vendor/allwinnertech/boards/r528/r528s3-gemini-s1/scripts/sdram.ld.S.tmp [1KLD: nuttx
+Memory region         Used Size  Region Size  %age Used
+           sdram:    15555612 B  961943040 B      1.62%
+    reserve_dram:           0 B       100 KB      0.00%
+CP: nuttx.bin
+cp nuttx nuttx.elf
+Generating: nuttx.bin
+/data/dm/nuttx/../prebuilts/gcc/linux-x86_64/arm-none-eabi/bin/arm-none-eabi-strip --remove-section=.note.gnu.build-id nuttx
+/data/dm/nuttx/../prebuilts/gcc/linux-x86_64/arm-none-eabi/bin/arm-none-eabi-objcopy -v -O binary nuttx vela.bin
+copy from `nuttx' [elf32-littlearm] to `vela.bin' [binary]
+Firmware is being converted: vela.bin
+Copy nsh.fex to lichee board dir
+make: Leaving directory '/data/dm/nuttx'
+make: Entering directory '/data/dm/nuttx'
+Loaded configuration '.config'
+Minimal configuration saved to 'defconfig.tmp'
+make: Leaving directory '/data/dm/nuttx'
+== [2/2] 打包（末尾自动校验）==
+Setup env done!
+Run [32mlunch_nuttx[0m to select project
+run "m bootloader or mnuttx bootloader" to build bootloader; "m bootloader c" to clean bootloader
+run "m deskmate or mnuttx deskmate" to build deskmate; "m deskmate c" to clean deskmate
+run "m deskmate_usbtest or mnuttx deskmate_usbtest" to build deskmate_usbtest; "m deskmate_usbtest c" to clean deskmate_usbtest
+run "m nsh or mnuttx nsh" to build nsh; "m nsh c" to clean nsh
+run "m nsh_minidisplay or mnuttx nsh_minidisplay" to build nsh_minidisplay; "m nsh_minidisplay c" to clean nsh_minidisplay
+run "pack" to pack all image
+[47;30mINFO: bl.fex original size 1997968[0m
+[47;30mINFO: bl.fex expanding size 1997968[0m
+copying tools file
+copying configs file
+storage_type value is 5
+rm /data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/sys_partition_nor.fex
+rm /data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/image_nor.cfg
+rm /data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/env_nor.cfg
+                                                                               Compressed 1997968 bytes into 1162990 bytes ==> 58.21%
+
+boot0 file Path=/data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/boot0_sdcard.fex
+script file Path=/data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/sys_config.bin
+skip_length = 576
+
+update_for_boot0 703
+update_for_boot0 705
+update_for_boot0 707
+update_for_boot0 710
+boot0->head.length:0
+update_for_boot0 714
+boot0 checksum fail
+pack boot package
+GetPrivateProfileSection read to end
+content_count=1
+
+toc1 file Path=/data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/boot_package.fex
+script file Path=/data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/sys_config.bin
+
+cant get board_id_enable
+script update toc1 ok
+packing for rtos
+normal
+nuttx not use freertos.fex
+grep: /data/dm/vendor/allwinnertech/lichee/lichee/rtos/projects/r528s3/gemini-s1_nand/defconfig: No such file or directory
+making data image for 128M nand
+res.fex
+try to create image: res to res.fex with size 26214400
+[47;31mERROR: not found /data/dm/vendor/allwinnertech/lichee/board/r528s3/gemini-s1_nand/data/res for creating res.fex, try default data!!!!![0m
+copy ap.fex to /data/dm/vendor/allwinnertech/lichee/board/common/data/res/ap
+cp: cannot stat '/data/dm/vendor/allwinnertech/lichee/board/r528s3/gemini-s1_nand/configs/ap.fex': No such file or directory
+The filesystem path: /data/dm/vendor/allwinnertech/lichee/board/common/data/res
+mkromfs /data/dm/vendor/allwinnertech/lichee/board/common/data/res /data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/res.fex
+--- create romfs image ---
+--- create romfs image end ---
+ori_size=23956480
+tr_size=23957504
+usrdata.fex
+try to create image: usrdata to usrdata.fex with size 182190080
+[47;31mERROR: not found /data/dm/vendor/allwinnertech/lichee/board/r528s3/gemini-s1_nand/data/usrdata for creating usrdata.fex, try default data!!!!![0m
+The filesystem path: /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK
+mkyaffs /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK /data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/usrdata.fex 2048
+--- create yaffs2 image ---
+mkyaffs2image: image building tool for YAFFS2 built Apr 27 2023
+Processing directory /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK into image file /data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image/usrdata.fex
+Object 257, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/s16le_48000_stereo.pcm is a file, 785 data chunks written
+Object 258, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/book is a directory
+Object 259, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/book/dao_de_jing.txt is a file, 2 data chunks written
+Object 260, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/book/示例-西游记.txt is a file, 1074 data chunks written
+Object 261, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/on.wav is a file, 1856 data chunks written
+Object 262, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/spk1.wav is a file, 1 data chunks written
+Object 263, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/1kHz.wav is a file, 90 data chunks written
+Object 264, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/DACDRC.conf is a file, 1 data chunks written
+Object 265, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/sweep-x4b.wav is a file, 266 data chunks written
+Object 266, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/logo1.bin is a file, 29 data chunks written
+Object 267, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/test.pcm is a file, 1303 data chunks written
+Object 268, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/startup.wav is a file, 945 data chunks written
+Object 269, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/music is a directory
+Object 270, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/music/laojie.mp3 is a file, 2697 data chunks written
+Object 271, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/demo is a file, 1 data chunks written
+Object 272, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/spk.wav is a file, 93 data chunks written
+Object 273, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/etc is a directory
+Object 274, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/etc/wifi is a directory
+Object 275, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/etc/wifi/wapi.conf is a file, 1 data chunks written
+Object 276, /data/dm/vendor/allwinnertech/lichee/board/common/data/UDISK/clocktick.wav is a file, 13 data chunks written
+Operation complete.
+40 objects in 5 directories
+9177 NAND pages
+--- create yaffs2 image end ---
+ori_size=18794496
+tr_size=18796544
+this is not a partition key
+update mbr file ok
+====================================
+show "sys_partition_for_dragon.fex" message
+------------------------------------
+  [mbr]
+  mbr_size  : 256 Kbyte
+------------------------------------
+  partition_name  : bootloader0
+  partition_size  : 2048
+------------------------------------
+  partition_name  : dummy_1
+  partition_size  : 262144
+------------------------------------
+  partition_name  : boot0-direct
+  partition_size  : 2048
+------------------------------------
+  partition_name  : uboot-direct
+  partition_size  : 8192
+------------------------------------
+  partition_name  : reserved_1
+  partition_size  : 2048
+------------------------------------
+  partition_name  : sst
+  partition_size  : 2560
+------------------------------------
+  partition_name  : bootloader
+  partition_size  : 102400
+  downloadfile  : nsh.fex
+  nsh.fex size : 8.2M byte
+------------------------------------
+  partition_name  : res
+  partition_size  : 51200
+  downloadfile  : res.fex
+  res.fex size : 23M byte
+------------------------------------
+  partition_name  : usrdata
+  partition_size  : 355840
+  downloadfile  : usrdata.fex
+  usrdata.fex size : 18M byte
+------------------------------------
+/data/dm/vendor/allwinnertech/lichee/tools/tool/
+/data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/image
+Begin Parse sys_partion.fex
+Add partion nsh.fex NSH_FEX000000000
+Add partion very nsh.fex NSH_FEX000000000
+FilePath: nsh.fex
+FileLength=830540Add partion res.fex RES_FEX000000000
+Add partion very res.fex RES_FEX000000000
+FilePath: res.fex
+FileLength=16d9000Add partion usrdata.fex USRDATA_FEX00000
+Add partion very usrdata.fex USRDATA_FEX00000
+FilePath: usrdata.fex
+FileLength=11ed000BuildImg 0
+Dragon execute image.cfg SUCCESS !
+-----------rtos_nuttx_r528s3-gemini-s1_uart0_128Mnand.img----------------
+----------image is for nand/emmc----------
+----------image is at----------
+[0;31;1m
+/data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/rtos_nuttx_r528s3-gemini-s1_uart0_128Mnand.img
+[0m
+pack finish
+=== [post-dragon] 自动校验 res/nsh/镜像产物 ===
+[1] res.fex romfs 有效: volname=X4BResource, 目录=10, 文件=180
+[2] etc/wifi/FW_NIC_ACUT.bin: romfs 120424B == 源 120424B: True
+[2] etc/wifi/FW_NIC_BCUT.bin: romfs 120040B == 源 120040B: True
+[2] fonts/MiSans-Normal.ttf: romfs 7943504B == 源 7943504B: True
+[2] fonts/fa-solid-900.ttf: romfs 426112B == 源 426112B: True
+[2] fonts/fa-brands-400.ttf: romfs 210792B == 源 210792B: True
+[2] 提示音 23 个（期望 23）: True
+[3] nsh.fex == vela.bin (md5 49c2e3a4): True
+[4] 镜像含完整 res.fex 块: True
+[4] 镜像含完整 nsh.fex 块: True
+[5] res.fex 不早于源最新文件 (pet/pet_cat_walk_11.bin): True
+---
+[6] res.fex md5 : 13b344a66b2bbe61519e2affd0e3ef06  (23957504B)
+[6] nsh.fex md5 : 49c2e3a45a39cc0c004a233b2496947d  (8586560B)
+[6] 整包镜像 md5 : 53b2050cd333170ab94055a0fed1c73a  (53338112B)
+---
+=== 资源/产物检查: 通过 ✅ ===
+== 完成：产物已通过 check_res.sh 自证，可烧录 ==
+-rwxrwxr-x 1 arc arc 53338112 Oct 22 23:29 /data/dm/vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/rtos_nuttx_r528s3-gemini-s1_uart0_128Mnand.img

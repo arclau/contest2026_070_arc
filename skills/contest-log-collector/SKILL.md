@@ -1,9 +1,17 @@
 ---
 name: contest-log-collector
-description: "为 openvela AI 大赛归集 AI Coding 日志,采用工作区感应 + 自动入仓架构。只在 openvela 工作区内(当前目录向上能找到 .repo/)才采集;工作区内的对话结束时自动写入选手仓 logs/<github_login>/(只写文件,不自动 commit/push,选手自己 git push);工作区外的对话(含个人项目)完全不采集。手动工具 contest-snapshot / export-session.py 仍可选,用于查看清单或补导。Trigger: 大赛 AI 日志收集、contest log、AI Coding 日志、打包对话、archive session、归档会话、export session、把会话存到仓库、保存这次对话、把这个 session 提交、contest-snapshot."
+description: "为 openvela AI 大赛归集 AI Coding 日志,采用工作区感应 + 自动入仓架构。只在 openvela 工作区内(当前目录向上能找到 .repo/)才采集;工作区内的对话结束时自动写入选手仓 logs/成员目录/(只写文件,不自动 commit/push,选手自己 git push);工作区外的对话(含个人项目)完全不采集。手动工具 contest-snapshot / export-session.py 仍可选,用于查看清单或补导。Trigger: 大赛 AI 日志收集、contest log、AI Coding 日志、打包对话、archive session、归档会话、export session、把会话存到仓库、保存这次对话、把这个 session 提交、contest-snapshot."
 ---
 
 # Contest Log Collector — openvela AI 大赛 AI Coding 日志归集
+
+> **DesktopMate P254 本地核验要求**：下文的“自动入仓”是预期能力，须以当前适配器实测为准。核对本次 session ID、来源工具/cwd、非零事件数及 manifest；不能用旧日志或 MiMo 当日导出来证明其他工具已采集。`wrap_session.sh` 的 MiMo 导出未限定工作区，修复前不要直接运行该默认步骤。仅导出 `/data/dm` 的目标 session；当前 Codex rollout 的 `response_item` 格式与仓内只读取 `.message.content` 的共享转换器不匹配，直接调用可能得到 0 事件，应如实记录缺口或做可追溯适配。收尾按 `project_docs/specs/misc/development-workflow.md`。
+
+> **P365/P366 实测**：Codex `response_item` 用 `scripts/export_codex_rollouts.py` 回填；CodeBuddy 用 `scripts/export_codebuddy_sessions.py` 回填。两者均限 `/data/dm`、隐去工具载荷并遮盖敏感消息。CodeBuddy 已加入本仓 schema；这不代表大赛官方 schema 已支持。自动 hook 仍待验证。
+
+> **P367 时点记录**：用户当时要求先保留全部 268 份会话，后续再筛选。旧 MiMo 导出器将 7 份会话误标为 `opencode`，核对真实来源时应按 session ID 对照 MiMo 数据库。
+
+> **P368 公开前筛查**：后续用户要求删去敏感与明显操作失误会话；当前交付目录留 159 份。旧日志工具载荷/思考字段已隐去；恢复原件只在仓外备份。详见 `logs/README.md` 和 P368 节点。
 
 为 openvela AI 大赛提供 AI Coding 日志归集能力,**工作区感应、对话结束自动入仓**。
 
@@ -151,7 +159,8 @@ JSONL 每条事件必含字段:
 | Claude Code (大赛主推) | CLI / AIoT-IDE 内嵌 | ✅ 完全支持(包括 slash command) |
 | AIoT-IDE | VS Code fork + Claude Code 插件 | ✅ 完全支持 |
 | OpenCode | CLI / TUI / VS Code 扩展 | ✅ 完全支持 |
-| Codex | CLI | ✅ 自然语言触发 |
+| Codex | CLI | 手动回填已验证；自动 hook 待验 |
+| CodeBuddy | CLI | 本地回填已验证；本仓 schema 已扩展 |
 | Kiro | IDE | ⏸️ 暂未实现 |
 
 ## License

@@ -57,6 +57,14 @@ CSRCS += ../../drivers/gt9271_iic_touch.c
 CFLAGS += ${INCDIR_PREFIX}$(TOPDIR)/arch/arm/include
 endif
 
+# HX83102 IIC Touchscreen Support (Himax, zero-flash)
+ifeq ($(CONFIG_HX83102_IIC_TOUCH),y)
+CSRCS += ../../drivers/hx83102_iic_touch.c
+CSRCS += ../../drivers/hx83102_firmware.c
+# Note: HAL headers are centralized in chips/r528/Make.defs
+CFLAGS += ${INCDIR_PREFIX}$(TOPDIR)/arch/arm/include
+endif
+
 ifeq ($(CONFIG_ETC_ROMFS),y)
   RCSRCS += etc/init.d/rc.sysinit etc/init.d/rcS
  # RCRAWS += etc/key.avb

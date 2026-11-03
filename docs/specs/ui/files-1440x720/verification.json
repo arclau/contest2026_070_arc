@@ -1,0 +1,105 @@
+{
+  "observed_at": "2026-10-16T13:36:12.327127+00:00",
+  "source_files": [
+    {
+      "path": "vendor/allwinnertech/apps/luncher_dm/ui/ui_files.c",
+      "bytes": 75004,
+      "sha256": "3d97b655ffe112a2de8a723330c70b266c92d2383f4698002938cb751d037a88"
+    },
+    {
+      "path": "vendor/allwinnertech/apps/luncher_dm/deskmate_ui.c",
+      "bytes": 164703,
+      "sha256": "9e6060a1f421afc0d2d396c6df0280e9825957650193be1e952ed45dfce41da6"
+    },
+    {
+      "path": "vendor/allwinnertech/apps/luncher_dm/deskmate_ui.h",
+      "bytes": 20088,
+      "sha256": "589bda8344c1cefe88d10ffd1c8e2f80f5b22733a87431c489d973925523e5cc"
+    },
+    {
+      "path": "vendor/allwinnertech/apps/luncher_dm/dm_theme.c",
+      "bytes": 6771,
+      "sha256": "80d3f75d64ea2c0546c48fe08b2c1d34f3ec91a078e2ea9a670e48f55d248dec"
+    },
+    {
+      "path": "vendor/allwinnertech/apps/luncher_dm/dm_theme.h",
+      "bytes": 4554,
+      "sha256": "d4652c915cfad1b0df8762f9951d2a1c3a5c930fce2ff2e71eeedc452e3d0102"
+    },
+    {
+      "path": "vendor/allwinnertech/apps/luncher_dm/tests/files_offscreen/CMakeLists.txt",
+      "bytes": 1394,
+      "sha256": "c86844cb3730c78e0fb87d9d837e8b41d58605d9b7ceb624577e6e561ea8eb97"
+    },
+    {
+      "path": "vendor/allwinnertech/apps/luncher_dm/tests/files_offscreen/README.md",
+      "bytes": 1014,
+      "sha256": "a00ed91c72991a27284852ff6c7679160d2ba98c9d03ec6a0fd7ed236a7ace71"
+    },
+    {
+      "path": "vendor/allwinnertech/apps/luncher_dm/tests/files_offscreen/preview.c",
+      "bytes": 10820,
+      "sha256": "2453c4ab24e18e337810d722a49dc642d9fcc42c2f030733ebd1f6c35bed601f"
+    },
+    {
+      "path": "vendor/allwinnertech/apps/luncher_dm/tests/files_offscreen/run.py",
+      "bytes": 4096,
+      "sha256": "72b59ea396c9ba93a3dd87b7133682ba767ba751657b84b22ddd08306e3675cb"
+    }
+  ],
+  "sim": {
+    "build": "passed",
+    "runtime": "not_checked",
+    "artifacts": [
+      {
+        "path": "cmake_out/vela_goldfish-arm64-v8a-ap/nuttx",
+        "bytes": 59801624,
+        "sha256": "0e24a48fe3bd1c7fc63d9610800487152f1ba7bdb7a376aa0ca35602119b6707"
+      },
+      {
+        "path": "cmake_out/vela_goldfish-arm64-v8a-ap/.config",
+        "bytes": 105830,
+        "sha256": "99e2667f6b254e5f639e3008cdeda66b2e8b9d6b08d9fbde9a718bc43388244e"
+      }
+    ]
+  },
+  "board": {
+    "build": "passed",
+    "pack": "passed",
+    "check_res": "passed",
+    "runtime": "not_checked",
+    "artifacts": [
+      {
+        "path": "nuttx/nuttx",
+        "bytes": 8656888,
+        "sha256": "756a219d69d8cd8819aef630bc6574ff9d209f44c080c8fe23d8949b214d9a41"
+      },
+      {
+        "path": "nuttx/vela.bin",
+        "bytes": 8651736,
+        "sha256": "c0ef329054ab3830e7deccf3fb2e600840630b9245e4456032e25964af0972cc"
+      },
+      {
+        "path": "nuttx/.config",
+        "bytes": 147630,
+        "sha256": "cd6102909a7b50dff6969204f254cc6370a98a1360d21a68e7ef1d11fe272e44"
+      },
+      {
+        "path": "vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/rtos_nuttx_r528s3-gemini-s1_uart0_128Mnand.img",
+        "bytes": 53402624,
+        "sha256": "00a6477804a0c9e464139d927aae1893a101e0a2a8e3f0ef02a5af8908900f86"
+      }
+    ]
+  },
+  "offscreen": {
+    "checks": "passed",
+    "log": "offscreen-checks.txt",
+    "media": "stubbed",
+    "display": "native LVGL software renderer, RGB565"
+  },
+  "session": {
+    "tool": "codex",
+    "id": "01a144d0-82e8-7950-bf83-15f6269f660c",
+    "export": "missing"
+  }
+}

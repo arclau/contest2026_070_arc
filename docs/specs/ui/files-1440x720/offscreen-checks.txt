@@ -1,0 +1,12 @@
+PASS reader return preserves file navigation ownership
+list viewport x=344 y=186 w=1070 h=508; row=112
+PASS copy + conflict rename + clipboard cleared
+PASS cut + paste removes source
+PASS create folder + cancel delete + confirmed delete
+PASS deep path menu + ancestor navigation
+PASS long press + release + next tap
+PASS deselect last item remains in selection mode
+PASS cross-filesystem directory move fallback removes entire source
+PASS self-descendant paste blocked + normalized system protection
+PASS close/reopen during copy + worker busy lifetime + file size
+ALL OFFSCREEN CHECKS PASSED

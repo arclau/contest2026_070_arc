@@ -17,6 +17,123 @@
 
 #include "deskmate_ui.h"
 #include "dm_pet.h"                    /* 宠物数据/开关/重置 */
+#include "pet_renderer.h"
+
+/* Independent preview: does not alter the pet's save, mood or lock-screen state. */
+static pet_renderer_t g_preview;
+static lv_timer_t *g_preview_timer;
+static lv_obj_t *g_preview_choices;
+static lv_obj_t *g_preview_status;
+static pet_action_t g_preview_action;
+static uint32_t g_preview_instance;
+static bool g_preview_held;
+static bool g_preview_mirror;
+
+static void pet_preview_clear(void)
+{
+    if (g_preview_timer) { lv_timer_del(g_preview_timer);g_preview_timer=NULL; }
+    if (g_preview.image && lv_obj_is_valid(g_preview.image)) lv_image_set_src(g_preview.image,NULL);
+    pet_renderer_clear(&g_preview);
+    g_preview_choices=NULL;g_preview_status=NULL;g_preview_held=false;
+}
+
+static void pet_preview_tick(lv_timer_t *timer)
+{
+    (void)timer;
+    pet_renderer_step(&g_preview,g_preview_action,g_preview_instance,
+        g_preview_held,g_preview_mirror,lv_tick_get());
+    if (g_preview_status)
+        lv_label_set_text(g_preview_status,g_preview.resource_error ? "素材加载失败" :
+            (g_preview_action==PET_ACTION_PET_NUZZLE ? "按住猫猫贴贴，松手收势" : g_pet_actions[g_preview_action].label));
+}
+
+static void pet_preview_start(pet_action_t action)
+{
+    g_preview_action=action;++g_preview_instance;g_preview_held=false;
+    pet_preview_tick(NULL);
+}
+
+static void pet_preview_choose(lv_event_t *event)
+{
+    pet_preview_start((pet_action_t)lv_dropdown_get_selected(lv_event_get_target(event)));
+}
+
+static void pet_preview_control(lv_event_t *event)
+{
+    int command=(int)(intptr_t)lv_event_get_user_data(event);
+    if (command==2) g_preview_mirror=!g_preview_mirror;
+    else if (command) g_preview_action=(pet_action_t)(((int)g_preview_action+command+PET_ACTION_COUNT)%PET_ACTION_COUNT);
+    lv_dropdown_set_selected(g_preview_choices,g_preview_action);
+    pet_preview_start(g_preview_action);
+}
+
+static void pet_preview_touch(lv_event_t *event)
+{
+    if (g_preview_action!=PET_ACTION_PET_NUZZLE) return;
+    bool pressed=lv_event_get_code(event)==LV_EVENT_PRESSED;
+    g_preview_held=pressed;
+    if (pressed) ++g_preview_instance;
+    pet_preview_tick(NULL);
+}
+
+static void pet_preview_deleted(lv_event_t *event)
+{
+    (void)event;pet_preview_clear();
+}
+
+static void pet_preview_create(lv_obj_t *parent)
+{
+    pet_preview_clear();
+    lv_obj_t *card=settings_group_card(parent);
+    lv_obj_set_style_pad_all(card,DM(10),0);
+    lv_obj_set_style_pad_row(card,DM(6),0);
+    lv_obj_add_event_cb(card,pet_preview_deleted,LV_EVENT_DELETE,NULL);
+    lv_obj_t *title=lv_label_create(card);
+    lv_label_set_text(title,"动作预览");lv_obj_set_style_text_font(title,FONT_BODY,0);
+    lv_obj_set_style_text_color(title,lv_color_hex(COL_TEXT),0);
+    lv_obj_t *stage=lv_obj_create(card);
+    lv_obj_remove_style_all(stage);
+    lv_obj_set_size(stage,LV_PCT(100),DM(116));
+    lv_obj_clear_flag(stage,LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(stage,LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(stage,pet_preview_touch,LV_EVENT_PRESSED,NULL);
+    lv_obj_add_event_cb(stage,pet_preview_touch,LV_EVENT_RELEASED,NULL);
+    lv_obj_add_event_cb(stage,pet_preview_touch,LV_EVENT_PRESS_LOST,NULL);
+    lv_obj_t *image=lv_image_create(stage);
+    lv_obj_remove_flag(image,LV_OBJ_FLAG_CLICKABLE);
+    pet_renderer_init(&g_preview,image,DM(107));lv_obj_center(image);
+    g_preview_status=lv_label_create(card);
+    lv_obj_set_style_text_font(g_preview_status,FONT_CAPTION,0);
+    lv_obj_set_style_text_color(g_preview_status,lv_color_hex(COL_SEC),0);
+    g_preview_choices=lv_dropdown_create(card);
+    lv_obj_set_width(g_preview_choices,LV_PCT(100));
+    lv_obj_set_style_text_font(g_preview_choices,FONT_BODY,0);
+    lv_obj_set_style_text_font(lv_dropdown_get_list(g_preview_choices),FONT_BODY,0);
+    char options[256]={0};size_t used=0;
+    for (int i=0;i<PET_ACTION_COUNT;i++) {
+        int n=snprintf(options+used,sizeof(options)-used,"%s%s",i ? "\n" : "",g_pet_actions[i].label);
+        if (n<0 || (size_t)n>=sizeof(options)-used) break;
+        used+=(size_t)n;
+    }
+    lv_dropdown_set_options(g_preview_choices,options);
+    lv_obj_add_event_cb(g_preview_choices,pet_preview_choose,LV_EVENT_VALUE_CHANGED,NULL);
+    lv_obj_t *controls=lv_obj_create(card);lv_obj_remove_style_all(controls);
+    lv_obj_set_size(controls,LV_PCT(100),DM(34));
+    lv_obj_set_flex_flow(controls,LV_FLEX_FLOW_ROW);lv_obj_set_style_pad_column(controls,DM(6),0);
+    const char *labels[]={"上一个","重播","下一个","转向"};
+    const int commands[]={-1,0,1,2};
+    for (unsigned i=0;i<4;i++) {
+        lv_obj_t *button=lv_button_create(controls);
+        lv_obj_set_flex_grow(button,1);lv_obj_set_height(button,LV_PCT(100));
+        lv_obj_set_style_bg_color(button,lv_color_hex(COL_BLUE),0);
+        lv_obj_set_style_radius(button,DM(8),0);
+        lv_obj_add_event_cb(button,pet_preview_control,LV_EVENT_CLICKED,(void *)(intptr_t)commands[i]);
+        lv_obj_t *label=lv_label_create(button);lv_label_set_text(label,labels[i]);
+        lv_obj_set_style_text_font(label,FONT_BODY,0);lv_obj_center(label);
+    }
+    g_preview_mirror=false;pet_preview_start(PET_ACTION_IDLE_SIT);
+    g_preview_timer=lv_timer_create(pet_preview_tick,33,NULL);
+}
 
 /* ================================================================
  * 宠物设置状态（原 ui_settings.c）
@@ -134,7 +251,7 @@ static void settings_pet_name_cb(lv_event_t *e)
     /* name[32] 字节 ≈ 10 个汉字；旧“≤15字”写超会被 strncpy 静默截断 */
     lv_textarea_set_max_length(ta, 10);
     lv_textarea_set_placeholder_text(ta, "输入名字（≤10字）");
-    lv_textarea_set_text(ta, pd->name[0] ? pd->name : "旺财");
+    lv_textarea_set_text(ta, pd->name[0] ? pd->name : "维拉");
     lv_obj_set_style_text_font(ta, FONT_BODY, 0);
     lv_obj_set_style_bg_color(ta, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_radius(ta, DM(8), 0);
@@ -201,7 +318,7 @@ static void settings_pet_refresh_info(void)
 {
     static const char *stage_names[] = { "幼年", "成长", "成年" };
     const dm_pet_data_t *pd = dm_pet_get_data();
-    const char *pet_name = (pd && pd->name[0]) ? pd->name : "旺财";
+    const char *pet_name = (pd && pd->name[0]) ? pd->name : "维拉";
     if (g_pet_name_lbl && lv_obj_is_valid(g_pet_name_lbl))
         lv_label_set_text(g_pet_name_lbl, pet_name);
     if (g_pet_stage_lbl && lv_obj_is_valid(g_pet_stage_lbl))
@@ -325,6 +442,7 @@ static void settings_pet_reset_cb(lv_event_t *e)
  * 此处只销毁 kb 状态 + 置空指针，防重进野指针） */
 void ui_pet_close_cleanup(void)
 {
+    pet_preview_clear();
     if (g_pet_name_kb) {
         dm_kb_destroy(g_pet_name_kb);
         g_pet_name_kb = NULL;
@@ -344,11 +462,12 @@ void ui_pet_create(lv_obj_t *parent)
     lv_obj_set_style_pad_row(parent, 4, 0);
 
     subpage_big_title(parent, "宠物");
+    pet_preview_create(parent);
 
     lv_obj_t *pet = settings_group_card(parent);
     {
         const dm_pet_data_t *pd = dm_pet_get_data();
-        const char *pet_name = (pd && pd->name[0]) ? pd->name : "旺财";
+        const char *pet_name = (pd && pd->name[0]) ? pd->name : "维拉";
 
         /* 名字行：value 显示名字（旧误传 pet_type 再事后改 label，语义错位） */
         lv_obj_t *name_row = settings_row_value(pet, LV_SYMBOL_EDIT, COL_PURPLE,

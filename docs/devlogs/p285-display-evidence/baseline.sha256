@@ -1,0 +1,5 @@
+65bce6eb1df45733e023256edbfb275d7bf0d8b5bd32c108d32720e71af07176  vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/disp/lcd/BOE_1440x720.c
+1982a5db3d327bc799bed2f4aca4e0e43d48a3138838897838b1b349d406528d  vendor/allwinnertech/chips/r528/drivers/rtos-hal/hal/source/disp2/soc/BOE_1440x720_mipi_config.c
+222e3192d0cd65dfff59c7d60db1da88d52b5613e9be8a5be883b96fe8b3caf5  nuttx/.config
+a950b5dbb094d0a008d78e5103d53b90bd519c9c32040545390c8a31d4d5c06d  nuttx/nuttx
+a11d2cdd7c8d333c2cf14de97fa117b5c9d79ea99fc39d8ba662abcbcdc172b1  vendor/allwinnertech/lichee/out/r528s3/gemini-s1_nand/rtos_nuttx_r528s3-gemini-s1_uart0_128Mnand.img

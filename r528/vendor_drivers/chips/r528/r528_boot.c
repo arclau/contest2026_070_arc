@@ -67,6 +67,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
+#include <unistd.h>
 
 #ifdef CONFIG_PAGING
 #include <nuttx/page.h>
@@ -744,6 +745,54 @@ void r528_early_initialize(void)
 	syslog_flush();
 }
 
+#if defined(CONFIG_HX83102_IIC_TOUCH) && defined(CONFIG_DRIVERS_TWI) && \
+    defined(CONFIG_R528_TWI0)
+static void r528_i2c_probe_bus0(FAR struct i2c_master_s *bus,
+                                FAR const char *tag)
+{
+	struct i2c_msg_s msg;
+	uint8_t val;
+	int ok = 0;
+
+	if (!bus)
+		return;
+
+	/* P286-E10: 原 112 地址 x 2 笔背靠背全扫描共 224 笔无间隔事务，
+	 * 2026-10-26 02:51/03:02 两次启动实证会楔死 HX83102B 模组总线
+	 * （03:02：扫描时 0x48 还 ACK，随后 init 30 笔全 -1，post-touch
+	 * 0 设备）。参考 F101 同型号模组结论：IC 扛不住连续快速传输。
+	 * 改为只探已知触摸地址 0x48，两笔之间给真实间隔。
+	 * 注意 up_udelay 基于坏的 CONFIG_BOARD_LOOPSPERMSEC 忙等，实测
+	 * ≤1ms，不可用；usleep 走 tick（CONFIG_USEC_PER_TICK=1000）。
+	 */
+
+	usleep(300 * 1000);
+
+	/* P286-E12: probe at the driver's working speed (50k, see
+	 * hx83102_iic_touch.h).  Probing at 100k/400k reports NACK even
+	 * when the IC answers fine at 50k (console A/B 2026-10-26 05:45),
+	 * which misreads as a dead module. */
+
+	msg.frequency = 50000;
+	msg.addr      = 0x48;
+	msg.flags     = 0;
+	msg.buffer    = NULL;
+	msg.length    = 0;
+	ok = (I2C_TRANSFER(bus, &msg, 1) == OK);
+
+	usleep(100 * 1000);
+
+	msg.frequency = 50000;
+	msg.addr      = 0x48;
+	msg.flags     = I2C_M_READ;
+	msg.buffer    = &val;
+	msg.length    = 1;
+	ok += (I2C_TRANSFER(bus, &msg, 1) == OK);
+
+	syslog(LOG_INFO, "[I2C] %s probe 0x48: %d/2 ok\n", tag, ok);
+}
+#endif
+
 void r528_late_initialize(void)
 {
 	arm_lowputc('H');
@@ -767,7 +816,9 @@ void r528_late_initialize(void)
 #endif
 
 #ifdef CONFIG_DRIVERS_PWM
-#ifdef CONFIG_LCD_SUPPORT_BOE_1200X1920
+#if defined(CONFIG_LCD_SUPPORT_BOE_1200X1920) || \
+    defined(CONFIG_LCD_SUPPORT_BOE_1440X720) || \
+    defined(CONFIG_LCD_SUPPORT_TIANMA_1080X2160)
   r528_pwm_initialize("/dev/pwm0", 4);
 #else
 	r528_pwm_initialize("/dev/pwm0", 0);
@@ -946,12 +997,10 @@ extern struct spi_dev_s *sunxi_spibus_initialize(int port);
   realtek_wlan_bringup();
 #endif
 
-#ifdef CONFIG_COMPONENTS_BLUETOOTH
-    /* 2026-09-15 暂时关闭蓝牙（用户要求，勿删）：rtk8723FS_initialize 会创建
-     * bt_recv/bt_fw 内核线程，bt_recv 空转占满 CPU1（top 50.2%），且蓝牙 H5
-     * 一直 bthci open timeout(-110) 不可用。以后要用再把下面两行放开。 */
-    /* int rtk8723FS_initialize (uint8_t id); */
-    /* rtk8723FS_initialize(0); */
+#if defined(CONFIG_COMPONENTS_BLUETOOTH) && !defined(CONFIG_LUNCHER_DM_APP)
+    /* V1 uses UART1 for the serial debug tool, not the BT controller. */
+    int rtk8723FS_initialize (uint8_t id);
+    rtk8723FS_initialize(0);
 #endif
 
 #ifdef CONFIG_DRIVERS_CE
@@ -1002,6 +1051,18 @@ extern struct spi_dev_s *sunxi_spibus_initialize(int port);
 #else
     r528_disp_init();
 #endif
+#endif
+
+#if defined(CONFIG_HX83102_IIC_TOUCH) && defined(CONFIG_DRIVERS_TWI) && \
+    defined(CONFIG_R528_TWI0)
+  /* Register touch only after the panel is powered and initialized:
+   * the touch controller shares the panel supply/connector. */
+  extern int hx83102_register(FAR const char *devpath,
+                             FAR struct i2c_master_s *dev);
+  r528_i2c_probe_bus0(i2c_bus0, "pre-touch");
+  if (i2c_bus0)
+    hx83102_register("/dev/input0", i2c_bus0);
+  r528_i2c_probe_bus0(i2c_bus0, "post-touch");
 #endif
 
 #ifdef CONFIG_MICRO_TF

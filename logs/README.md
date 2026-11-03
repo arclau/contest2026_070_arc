@@ -2,27 +2,31 @@
 
 本目录存放开发过程中与 AI 工具的对话会话，随作品代码一并提交。
 
-## 为什么是"脚本提取"而不是"插件自动写入"（如实说明）
+## 当前来源（2026-11-02；以 `arclau/manifest.json` 为准）
 
-本作品开发**主要使用的 AI 工具是 AtomCode**（AtomGit 的 AI 编码助手）。
+| 工具 | 会话数 | 状态 |
+|---|---:|---|
+| Codex | 51 | 公开前逐份筛查；隐去旧工具载荷 |
+| CodeBuddy | 40 | 隐去工具载荷和敏感消息块 |
+| OpenCode | 62 | 含旧脚本误标来源的 MiMo 会话 |
+| Claude Code | 6 | 隐去旧工具载荷 |
+| **合计** | **159** | 33,720 条事件；本仓校验器通过 |
 
-- 比赛官方采集器 `contest-log-collector` 支持的工具有限，**枚举为 claude-code / opencode / codex / kiro / mimocode / cursor，不包含 AtomCode**；
-- 因此官方插件 / hooks **无法自动把 AtomCode 的会话写入本仓 `logs/`**——不是我们没装采集器，而是**所用工具不在官方支持范围内**；
-- 为让评审能看到完整的 AI Coding 过程，本仓用**一次性归一化脚本**把 AtomCode 的原始会话转换为比赛事件 schema 后入仓，`tool` 字段**如实标注为 `atomcode`**，不冒充任何受支持工具；
-- 同期使用过的 **OpenCode / Claude Code 属官方支持工具**，其会话由官方 `export-session.py --backfill` 导出，`tool` 标注为 `opencode` / `claude-code`。
+Codex 原有共享转换器无法解析 `response_item`。补采脚本按原始顺序保留用户、
+助手和工具事件，记录源行号；工具入参/结果一律隐去，敏感消息整块遮盖。
+因此补采的 Codex 日志在 manifest 中标为 `degraded`，不能代表完整工具输入输出。
 
-> ⚠️ 说明：官方校验器 `validate-log.py` 的 `tool` 枚举不含 `atomcode`，因此 AtomCode 会话会报"枚举不符"错误。这是**"如实标注真实来源"与"官方枚举未覆盖该工具"之间的冲突，不是篡改**。所有会话的 `seq` 单调、内容未经人工改写，可审计（见下方"重新生成/校验"）。
-
-## 来源与统计（共 149 会话）
-
-| 工具 | 会话数 | 来源方式 | 官方支持 |
-|---|---|---|---|
-| **AtomCode** | **93** | `~/.atomcode/sessions/` → 本仓脚本归一化 | ❌ 不在支持列表 |
-| OpenCode | 47 | 官方 `export-session.py --backfill` | ✅ |
-| Claude Code | 9 | 官方 `export-session.py --backfill` | ✅ |
-| **合计** | **149** | | |
-
-> AtomCode 仅保留**与本作品相关**的会话（工作目录在 `/data/dm`、`/data/openvela`）；已剔除与该作品无关的其它项目会话（armbian / rk3576 / wifitest 等）。
+本机有 43 份 CodeBuddy `/data/dm` 会话（约 108 MB）；41 份按原始顺序转换，
+2 份没有 cwd 证据而跳过。工具载荷隐去，敏感消息整块遮盖。
+本仓 schema 已扩展 `codebuddy`，不代表大赛官方 schema 已支持该工具。
+公开前从 268 份中整份移出 109 份：敏感信息、明确的用户操作失误，
+以及本次日志管理会话。旧日志的 4,992 条工具载荷、2,234 条思考字段已隐去；
+另遮盖 273 个敏感消息块、23 个私人目录路径消息块和 24 个归责表述消息块。
+原件与逐份理由、哈希保存在仓外 `/data/dm/output/p368-public-review/`。
+移出的 109 份中有 102 份曾由本地旧分支跟踪；本 PR 候选从上游基点新建。
+其中 8 份已存在于上游历史；当前文件删除不清除旧提交。
+MiMo Coding 旧导出器曾将来源误标为 `opencode`，需按源 session ID 辨认。
+过去的 AtomCode 提取脚本仍保留。
 
 ## 目录结构
 
@@ -31,32 +35,32 @@ logs/
 └── arclau/                        # GitHub 用户名
     ├── manifest.json              # 会话清单（含每个会话的 tool/日期/file_path/event_count）
     └── <YYYY-MM-DD>/
-        ├── atomcode__<sid>.jsonl  # AtomCode 会话（脚本归一化）
-        ├── opencode__<sid>.jsonl  # OpenCode 会话（官方 backfill）
+        ├── codex__<sid>.jsonl     # Codex 会话
+        ├── codebuddy__<sid>.jsonl # CodeBuddy 会话
+        ├── opencode__<sid>.jsonl  # OpenCode 会话
         └── claude-code__<sid>.jsonl
 ```
 
 事件 schema：每行一个事件，字段 `schema_version / session_id / team_id / github_login / tool / seq / ts / role / text|thinking|tool_*`。
 
-## 提取脚本
+## 提取与核验
 
-- `skills/contest-log-collector/scripts/backfill_atomcode.py`：把 AtomCode 的 turn 记录（`user / reasoning / assistant / tools[]`）映射为比赛事件（`user → thinking → assistant → tool`），并生成 `manifest.json`。
-- OpenCode / Claude Code 由官方 `skills/contest-log-collector/tools/export-session.py --backfill` 导出。
-
-## 重新生成
-
-```bash
-# AtomCode（本项目所用工具，官方不支持，故用此脚本）
-python3 skills/contest-log-collector/scripts/backfill_atomcode.py --repo . --output logs
-
-# OpenCode + Claude Code（官方支持，用官方工具）
-python3 <contest-log-collector>/tools/export-session.py --backfill --source all --dest . --confirm
-```
+- `skills/contest-log-collector/scripts/export_codex_rollouts.py`：仅收集 session/turn cwd 属于
+  `/data/dm` 的 Codex rollout；支持 `--dry-run`、`--session <ID>` 和 `--refresh`。
+- `skills/contest-log-collector/scripts/export_codebuddy_sessions.py`：仅收集 `data-dm`
+  下有 cwd 证据的 CodeBuddy 会话；工具输入/结果不入仓。
+- `skills/contest-log-collector/tools/export-session.py`：已有 OpenCode / Claude Code
+  staging 会话的官方导出入口；不得用跨工作区的 `--all` 代替定向采集。
+- `skills/contest-log-collector/scripts/backfill_atomcode.py`：历史工具，当前 manifest
+  未包含其产物。
 
 ## 校验
 
 ```bash
-python3 <contest-log-collector>/tools/validate-log.py logs/
+python3 skills/contest-log-collector/tools/validate-log.py logs/
 ```
 
-预期：OpenCode / Claude Code 会话全部通过；**AtomCode 会话会因 `tool` 枚举不含 `atomcode` 而报错**——即上文说明的"如实标注来源"所致。
+公开前筛查后 159 个文件、33,720 条事件通过本仓 schema / manifest / seq 检查；
+本次日志管理会话有意不纳入交付目录。自动扫描无命中仍需在推送前人工复核。
+入仓前还需按 `project_docs/specs/misc/development-workflow.md` 扫描凭据；
+扫描无命中也不等于可以跳过来源与工作区核对。

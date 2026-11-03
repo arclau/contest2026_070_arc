@@ -150,6 +150,14 @@ struct __lcd_panel *panel_array[] = {
 	&BOE_1200x1920_panel,
 #endif
 
+#ifdef CONFIG_LCD_SUPPORT_BOE_1440X720
+	&BOE_1440x720_panel,
+#endif
+
+#ifdef CONFIG_LCD_SUPPORT_TIANMA_1080X2160
+	&TIANMA_1080x2160_panel,
+#endif
+
 	NULL,
 };
 

@@ -37,6 +37,11 @@ static uint8_t        bt_conn_addr[6];    /* 正在连接的对端 MAC */
 static int            bt_conn_pending;    /* 1 = 等待连接结果回读 */
 static int            bt_conn_tick;       /* 等待计数 */
 static int            bt_list_built;      /* 1 = 本轮发现已重建列表 */
+/* 2026-10-29 P300：可被发现开关回读 + 打开适配器后自动发现 */
+static lv_obj_t      *bt_disc_sw;         /* “可被发现”开关对象 */
+static int            bt_scan_started;    /* 本轮已成功 start_discovery（防重入/重试） */
+static int            bt_shown_count;     /* 已渲染设备数（发现过程中增量刷新） */
+static int            bt_disc_hold;       /* 用户刚切换后的静默 tick，等驱动回显 */
 
 /* ================================================================
  * BLUETOOTH 管理子页（wifijianyi.md 手机式接入）
@@ -51,6 +56,8 @@ static void bt_discover_switch_cb(lv_event_t *e)
     lv_obj_t *sw = lv_event_get_target(e);
     bool on = lv_obj_has_state(sw, LV_STATE_CHECKED);
     dm_net_bt_set_discoverable(on ? 1 : 0);
+    /* 驱动回显前不要被轮询改回去，否则开关会闪一下 */
+    bt_disc_hold = 4;
 }
 
 /* 配对弹窗：接受/拒绝 → dm_net_bt_pair_reply */
@@ -347,16 +354,55 @@ static void bt_poll_cb(lv_timer_t *timer)
 {
     (void)timer;
 
+    int bt_on = dm_net_bt_is_on();
+
+    /* 2026-10-29 P300：打开适配器后自动开始发现（含在子页里手动打开）。
+     * 用 bt_scan_started 而不是 ON 跳变：enable 异步，start_discovery 可能
+     * 早于适配器就绪失败，失败就下一 tick 重试。 */
+    if (!bt_on)
+        bt_scan_started = 0;
+    else if (!bt_scan_started && bt_list_cont) {
+        if (dm_net_bt_start_scan() == 0) {
+            bt_scan_started = 1;
+            bt_list_built = 0;
+            bt_shown_count = 0;
+            if (bt_status_lbl)
+                lv_label_set_text(bt_status_lbl, "正在搜索附近设备…");
+        }
+    }
+
     /* 2026-09-10 P206：连接等待期间不刷通用状态，保住"正在连接…"不被覆盖 */
     if (!bt_conn_pending && bt_status_lbl) {
-        int on = dm_net_bt_is_on();
-        lv_label_set_text(bt_status_lbl,
-            on ? "蓝牙已开启，正在搜索附近设备…" : "蓝牙未开启");
+        if (!bt_on)
+            lv_label_set_text(bt_status_lbl, "蓝牙未开启");
+        else if (!dm_net_bt_scan_done())
+            lv_label_set_text(bt_status_lbl, "正在搜索附近设备…");
+        else
+            lv_label_set_text_fmt(bt_status_lbl, "发现 %d 个设备",
+                                  dm_net_bt_dev_count());
+    }
+    /* 发现过程中设备陆续到达：数量变化就增量重建，不必等 15s 结束 */
+    if (bt_on && bt_list_cont && !dm_net_bt_scan_done() &&
+        dm_net_bt_dev_count() != bt_shown_count) {
+        bt_rebuild_list();
+        bt_shown_count = dm_net_bt_dev_count();
+        bt_list_built = 1;
     }
     /* 2026-09-10 P206：scan_done 置1后单轮只重建一次（防每500ms重复刷表） */
     if (dm_net_bt_scan_done() && bt_list_cont && !bt_list_built) {
         bt_rebuild_list();
+        bt_shown_count = dm_net_bt_dev_count();
         bt_list_built = 1;
+    }
+
+    /* 2026-10-29 P300：可被发现开关回读真实 scan mode（适配器关闭时强制关） */
+    if (bt_disc_sw && lv_obj_is_valid(bt_disc_sw)) {
+        bool real = bt_on && dm_net_bt_is_discoverable();
+        bool shown = lv_obj_has_state(bt_disc_sw, LV_STATE_CHECKED);
+        if (bt_disc_hold > 0)
+            bt_disc_hold--;
+        else if (real != shown)
+            lv_obj_set_state(bt_disc_sw, LV_STATE_CHECKED, real);
     }
     /* 2026-09-10 P206 推理链：connect 异步无回调 → 在此轮询回读
      * dm_net_bt_is_connected；成功显"已连接"并刷新已配对表，
@@ -397,6 +443,10 @@ static void bt_page_destructor_cb(lv_event_t *e)
     bt_conn_pending = 0;
     bt_conn_tick = 0;
     bt_list_built = 0;
+    bt_disc_sw = NULL;
+    bt_scan_started = 0;
+    bt_shown_count = 0;
+    bt_disc_hold = 0;
     if (bt_pair_overlay) {
         lv_obj_del(bt_pair_overlay);
         bt_pair_overlay = NULL;
@@ -440,8 +490,13 @@ void ui_bt_create(lv_obj_t *parent)
     settings_row_switch_cb(ctrl, LV_SYMBOL_BLUETOOTH, COL_BLUE, "蓝牙",
                            dm_net_bt_is_on(), settings_bt_cb);
     settings_add_separator(ctrl);
-    settings_row_switch_cb(ctrl, LV_SYMBOL_EYE_OPEN, COL_ORANGE,
-                           "可被发现", false, bt_discover_switch_cb);
+    lv_obj_t *disc_row =
+        settings_row_switch_cb(ctrl, LV_SYMBOL_EYE_OPEN, COL_ORANGE,
+                               "可被发现", dm_net_bt_is_discoverable(),
+                               bt_discover_switch_cb);
+    /* 开关是行内最后一个子对象（settings_row_switch_cb 返回整行） */
+    bt_disc_sw = lv_obj_get_child(disc_row, -1);
+    bt_disc_hold = 0;
 
     /* 已配对设备组（我的设备，低频轮询刷新） */
     settings_section_label(parent, "我的设备");
@@ -458,10 +513,12 @@ void ui_bt_create(lv_obj_t *parent)
     if (bt_timer) lv_timer_set_repeat_count(bt_timer, -1);
     lv_obj_add_event_cb(parent, bt_page_destructor_cb, LV_EVENT_DELETE, NULL);
 
-    /* 适配器已开 → 自动开始发现 */
-    if (dm_net_bt_is_on()) {
-        dm_net_bt_start_scan();
+    /* 适配器已开 → 立即开始发现（失败由 bt_poll_cb 重试） */
+    bt_scan_started = 0;
+    if (dm_net_bt_is_on() && dm_net_bt_start_scan() == 0) {
+        bt_scan_started = 1;
         bt_list_built = 0;   /* 2026-09-10 P206：新一轮发现允许重建列表 */
+        bt_shown_count = 0;
         if (bt_status_lbl)
             lv_label_set_text(bt_status_lbl, "正在搜索附近设备…");
     }

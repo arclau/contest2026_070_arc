@@ -39,6 +39,12 @@ endif
 ifeq ($(CONFIG_LCD_SUPPORT_BOE_1200X1920),y)
 CHIP_CSRCS += $(DISP_PATH)/soc/BOE_1200x1920_mipi_config.c
 endif
+ifeq ($(CONFIG_LCD_SUPPORT_BOE_1440X720),y)
+CHIP_CSRCS += $(DISP_PATH)/soc/BOE_1440x720_mipi_config.c
+endif
+ifeq ($(CONFIG_LCD_SUPPORT_TIANMA_1080X2160),y)
+CHIP_CSRCS += $(DISP_PATH)/soc/TIANMA_1080x2160_mipi_config.c
+endif
 endif
 
 
@@ -49,7 +55,7 @@ CHIP_CSRCS += $(DISP_PATH)/soc/disp_board_config.c
 CHIP_CSRCS += $(DISP_PATH)/soc/platform_resource.c
 CHIP_CSRCS += $(DISP_PATH)/disp/dev_disp.c
 CHIP_CSRCS += $(DISP_PATH)/disp/disp_sys_intf.c
-#CHIP_CSRCS += $(DISP_PATH)/disp/disp_debug.c
+CHIP_CSRCS += $(DISP_PATH)/disp/disp_debug.c
 CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_display.c
 CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_features.c
 CHIP_CSRCS += $(DISP_PATH)/disp/de/disp_device.c
@@ -115,6 +121,12 @@ endif
 
 ifeq ($(CONFIG_LCD_SUPPORT_BOE_1200X1920),y)
 CHIP_CSRCS += $(DISP_PATH)/disp/lcd/BOE_1200x1920.c
+endif
+ifeq ($(CONFIG_LCD_SUPPORT_BOE_1440X720),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/BOE_1440x720.c
+endif
+ifeq ($(CONFIG_LCD_SUPPORT_TIANMA_1080X2160),y)
+CHIP_CSRCS += $(DISP_PATH)/disp/lcd/TIANMA_1080x2160.c
 endif
 
 ifeq ($(CONFIG_LCD_SUPPORT_SSD1306),y)

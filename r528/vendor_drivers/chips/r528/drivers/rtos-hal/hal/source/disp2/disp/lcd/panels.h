@@ -186,6 +186,14 @@ extern struct __lcd_panel b080uan01_panel;
 extern struct __lcd_panel BOE_1200x1920_panel;
 #endif
 
+#ifdef CONFIG_LCD_SUPPORT_BOE_1440X720
+extern struct __lcd_panel BOE_1440x720_panel;
+#endif
+
+#ifdef CONFIG_LCD_SUPPORT_TIANMA_1080X2160
+extern struct __lcd_panel TIANMA_1080x2160_panel;
+#endif
+
 #ifdef CONFIG_LCD_SUPPORT_T070S140B
 extern struct __lcd_panel t070s140b_panel;
 #endif

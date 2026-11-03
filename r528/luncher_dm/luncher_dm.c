@@ -22,7 +22,7 @@
 
 #include <nuttx/config.h>
 
-#ifdef CONFIG_LUNCHER_APP
+#ifdef CONFIG_LUNCHER_DM_APP
 
 #include <unistd.h>
 #include <sys/boardctl.h>
@@ -41,15 +41,18 @@
 
 /* Desktop Mate UI (ported from lv_port_linux simulator) */
 #include "deskmate_ui.h"
+#include "dm_res.h"      /* 资源根：板端 /resource，SIM /data/data */
 #include "dm_health.h"   /* DesktopMate 健康模块：在座感知 + 双提醒状态机 */
 #include "dm_ld2410b.h"  /* 2026-08-23：LD2410B 毫米波雷达替代 LTR553 接近传感器 */
 #include "dm_health_cfg.h" /* 2026-08-27：ld2410_seat_cm 在座距离阈值配置化 */
 #include "dm_voice.h"      /* 2026-08-28 Voice Director：语音决策层 */
 #include "dm_als.h"        /* P153：LTR553 ALS 环境光（锁屏亮度显示 + 暗光开灯提醒） */
+#include "dm_glass.h"      /* P359：壁纸开机解码一次，常驻内存 */
 #include "pet_core.h"      /* 2026-09-10 P206：宠物引擎开机初始化（先有鸡先有蛋修复，见下） */
 #include "dm_alarm.h"      /* 2026-09-10 P206：闹钟引擎（读盘+1s检查timer） */
 #include "dm_weather.h"    /* T1：开机用上次落盘时间兜底（无 RTC 电池） */
 #include "dm_screenshot.h" /* 2026-09-11：LRADC 按键触发全屏截图存 TF 卡（本地固件） */
+#include "dm_perf.h"       /* 2026-10-28 B1：LVGL 刷新量测埋点（60s 汇总） */
 
 /* 包含传感器相关头文件 */
 #include <poll.h>
@@ -184,7 +187,7 @@ static led_error_t led_adapter_init(void);
 static led_error_t led_adapter_deinit(void);
 static led_error_t led_adapter_on(void);
 static led_error_t led_adapter_off(void);
-static led_error_t led_adapter_set_brightness(int32_t brightness);
+static led_error_t led_adapter_set_brightness(int32_t brightness) __attribute__((unused));
 static void led_adapter_diagnose(void);
 
 /* 传感器相关函数 */
@@ -258,14 +261,14 @@ static led_error_t led_adapter_off(void)
 static led_error_t led_adapter_set_brightness(int32_t brightness)
 {
     if (brightness < 0 || brightness > 100) {
-        LV_LOG_ERROR("LED adapter: Invalid brightness %d", brightness);
+        LV_LOG_ERROR("LED adapter: Invalid brightness %d", (int)brightness);
         return LED_ERROR_INVALID_PARAM;
     }
     g_led_brightness = brightness;
     /* 应用亮度设置 */
     led_error_t err = dm_led_set_brightness(brightness);
     if (err == LED_SUCCESS) {
-        LV_LOG_INFO("LED adapter: Brightness set to %d%%", brightness);
+        LV_LOG_INFO("LED adapter: Brightness set to %d%%", (int)brightness);
         
         /* 如果LED当前是开启的，需要重新应用设置 */
         if (g_led_is_on) {
@@ -306,13 +309,13 @@ static void init_fonts(void)
 {
     #ifdef LV_USE_FREETYPE
     /* 加载MiSans-Normal.ttf字体 */
-    g_misans_normal_11 = lv_freetype_font_create("/resource/fonts/MiSans-Normal.ttf",
+    g_misans_normal_11 = lv_freetype_font_create(DM_RES_ROOT "/fonts/MiSans-Normal.ttf",
                                                LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 66,
                                                LV_FREETYPE_FONT_STYLE_NORMAL);
-    g_misans_normal_12 = lv_freetype_font_create("/resource/fonts/MiSans-Normal.ttf",
+    g_misans_normal_12 = lv_freetype_font_create(DM_RES_ROOT "/fonts/MiSans-Normal.ttf",
                                                LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 72,
                                                LV_FREETYPE_FONT_STYLE_NORMAL);
-    g_misans_normal_16 = lv_freetype_font_create("/resource/fonts/MiSans-Normal.ttf",
+    g_misans_normal_16 = lv_freetype_font_create(DM_RES_ROOT "/fonts/MiSans-Normal.ttf",
                                                LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 96,
                                                LV_FREETYPE_FONT_STYLE_NORMAL);
     /* Desktop Mate 六档字体——字号对齐模拟器观感（montserrat 48/36/24/30/14）。
@@ -323,28 +326,28 @@ static void init_fonts(void)
      * 默认为 NULL，LV_SYMBOL_*（播放键/返回箭头/settings 图标）全部显示口口；每个
      * MiSans 字体 fallback → 同字号 montserrat 内置字体（自带全部 LV_SYMBOL 字形，
      * 模拟器符号正常即靠它，两端渲染路径一致）。 */
-    dm_font_title = lv_freetype_font_create("/resource/fonts/MiSans-Normal.ttf",
+    dm_font_title = lv_freetype_font_create(DM_RES_ROOT "/fonts/MiSans-Normal.ttf",
                                             LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 48,
                                             LV_FREETYPE_FONT_STYLE_NORMAL);
     /* P151：状态栏时间专用档 56px（283PPI ≈ 5.0mm 字高，达 8 寸屏正文可读
      * 标准；独立档位避免 48px title 被 26 处引用波及）。纯数字+冒号，
      * MiSans 全覆盖，无需符号 fallback。 */
-    dm_font_clock = lv_freetype_font_create("/resource/fonts/MiSans-Normal.ttf",
+    dm_font_clock = lv_freetype_font_create(DM_RES_ROOT "/fonts/MiSans-Normal.ttf",
                                             LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 56,
                                             LV_FREETYPE_FONT_STYLE_NORMAL);
-    dm_font_symbol = lv_freetype_font_create("/resource/fonts/fa-solid-900.ttf",
+    dm_font_symbol = lv_freetype_font_create(DM_RES_ROOT "/fonts/fa-solid-900.ttf",
                                              LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 140,
                                              LV_FREETYPE_FONT_STYLE_NORMAL); /* 备用：UI 当前未引用 FONT_SYMBOL */
-    dm_font_icon = lv_freetype_font_create("/resource/fonts/MiSans-Normal.ttf",
+    dm_font_icon = lv_freetype_font_create(DM_RES_ROOT "/fonts/MiSans-Normal.ttf",
                                            LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 36,
                                            LV_FREETYPE_FONT_STYLE_NORMAL);
-    dm_font_body = lv_freetype_font_create("/resource/fonts/MiSans-Normal.ttf",
+    dm_font_body = lv_freetype_font_create(DM_RES_ROOT "/fonts/MiSans-Normal.ttf",
                                            LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 24,
                                            LV_FREETYPE_FONT_STYLE_NORMAL);
-    dm_font_label = lv_freetype_font_create("/resource/fonts/MiSans-Normal.ttf",
+    dm_font_label = lv_freetype_font_create(DM_RES_ROOT "/fonts/MiSans-Normal.ttf",
                                             LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 30,
                                             LV_FREETYPE_FONT_STYLE_NORMAL);
-    dm_font_caption = lv_freetype_font_create("/resource/fonts/MiSans-Normal.ttf",
+    dm_font_caption = lv_freetype_font_create(DM_RES_ROOT "/fonts/MiSans-Normal.ttf",
                                               LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 14,
                                               LV_FREETYPE_FONT_STYLE_NORMAL);
     /* LV_SYMBOL_* fallback → fa-solid（WIFI/PLAY/BATTERY 等 57/61 符号）
@@ -354,12 +357,10 @@ static void init_fonts(void)
      * 的符号字形不完整（62 个符号仅前 18 个有真实位图，其余 bitmap_index
      * 越界读数组外内存，渲染为空白/垃圾），但 cmap 有映射导致 fallback
      * 链不会继续走到外部字体，WIFI/蓝牙因此不显示。 */
-    static lv_font_t *fs_sym_48, *fs_sym_36, *fs_sym_24, *fs_sym_30, *fs_sym_14;
-    static lv_font_t *fb_sym_48, *fb_sym_36, *fb_sym_24, *fb_sym_30, *fb_sym_14;
 #define DM_SYMBOL_FALLBACK(dmfont, sz) do { \
-        lv_font_t *fs = lv_freetype_font_create("/resource/fonts/fa-solid-900.ttf", \
+        lv_font_t *fs = lv_freetype_font_create(DM_RES_ROOT "/fonts/fa-solid-900.ttf", \
                 LV_FREETYPE_FONT_RENDER_MODE_BITMAP, (sz), LV_FREETYPE_FONT_STYLE_NORMAL); \
-        lv_font_t *fb = lv_freetype_font_create("/resource/fonts/fa-brands-400.ttf", \
+        lv_font_t *fb = lv_freetype_font_create(DM_RES_ROOT "/fonts/fa-brands-400.ttf", \
                 LV_FREETYPE_FONT_RENDER_MODE_BITMAP, (sz), LV_FREETYPE_FONT_STYLE_NORMAL); \
         if ((dmfont) && fs) { \
             (dmfont)->fallback = fs; \
@@ -374,15 +375,15 @@ static void init_fonts(void)
 #undef DM_SYMBOL_FALLBACK
     /* 检查字体加载是否成功，如果失败则回退到默认字体 */
     if(g_misans_normal_11 == NULL) {
-        g_misans_normal_11 = &lv_font_montserrat_12;
+        g_misans_normal_11 = (lv_font_t *)&lv_font_montserrat_12;
         LV_LOG_WARN("Failed to load MiSans-Normal 11, fallback to default font");
     }
     if(g_misans_normal_12 == NULL) {
-        g_misans_normal_12 = &lv_font_montserrat_12;
+        g_misans_normal_12 = (lv_font_t *)&lv_font_montserrat_12;
         LV_LOG_WARN("Failed to load MiSans-Normal 12, fallback to default font");
     }
     if(g_misans_normal_16 == NULL) {
-        g_misans_normal_16 = &lv_font_montserrat_16;
+        g_misans_normal_16 = (lv_font_t *)&lv_font_montserrat_16;
         LV_LOG_WARN("Failed to load MiSans-Normal 16, fallback to default font");
     }
     if(dm_font_title == NULL) {
@@ -607,7 +608,7 @@ static void update_sensor_cb(lv_timer_t *timer) {
      * P145：加「室内」前缀与天气卡（室外）区分，避免数值混淆。
      * 2026-09-10 P206：无传感器数据（updated<=0）显示"室内 --"，
      * 不再显示"室内 0°C | 0%"假零值。 */
-    char sbuf[32];
+    char sbuf[48];
     if (updated <= 0) {
         snprintf(sbuf, sizeof(sbuf), "室内 --");
     } else {
@@ -669,7 +670,7 @@ int luncher_dm_main(int argc, FAR char *argv[])
         info.fb_path = "/dev/lcd0";
     #endif 
     #ifdef CONFIG_INPUT_TOUCHSCREEN
-        info.input_path = CONFIG_LUNCHER_APP_INPUT_DEVPATH;
+        info.input_path = CONFIG_LUNCHER_DM_APP_INPUT_DEVPATH;
     #endif
     #ifdef CONFIG_LV_USE_NUTTX_LIBUV
         uv_loop_t ui_loop;
@@ -685,11 +686,15 @@ int luncher_dm_main(int argc, FAR char *argv[])
     }
     /* 初始化中文支持字体 */
     init_fonts();
+    /* P359：壁纸开机解码一次（失败保留 wash 渐变，不每帧重试） */
+    dm_glass_wallpaper_prepare();
     /* T1（2026-09-11）：无 RTC 电池，开机时间为 1970；先用上次成功对时
      * 落盘的时间兜底，时段问候/时钟立即合理，联网对时到了再覆盖校正。 */
     dm_time_restore_at_boot();
     /* 创建 Desktop Mate 界面 */
     deskmate_ui_create();
+    /* 2026-10-28 B1：刷新量测埋点（默认 display 事件，DM_PERF_ENABLE=0 即关） */
+    dm_perf_init();
     /* 2026-09-11：按键截图（本地固件；任一 LRADC 键 → /sdcard/screenshots/） */
     dm_screenshot_init();
     /* 传感器相关初始化（数据采集保留，UI 显示后续接入 deskmate 卡片） */
@@ -763,7 +768,9 @@ int luncher_dm_main(int argc, FAR char *argv[])
     /* 显示分辨率信息 */
     lv_disp_t *disp = lv_disp_get_default();
     lv_coord_t disp_width = lv_disp_get_hor_res(disp);
+    (void)disp_width;    /* 仅日志用；LV_LOG_INFO 在 ERROR 级下被编译掉 */
     lv_coord_t disp_height = lv_disp_get_ver_res(disp);
+    (void)disp_height;   /* 仅日志用；LV_LOG_INFO 在 ERROR 级下被编译掉 */
     LV_LOG_INFO("Display: %dx%d, App area: %dx%d",
                 disp_width, disp_height, SCREEN_WIDTH, SCREEN_HEIGHT);
     /* 主循环 */
@@ -782,4 +789,4 @@ int luncher_dm_main(int argc, FAR char *argv[])
     return 0;
 }
 
-#endif /* CONFIG_LUNCHER_APP */
+#endif /* CONFIG_LUNCHER_DM_APP */

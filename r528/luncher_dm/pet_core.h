@@ -3,7 +3,7 @@
  * 电子宠物 — 引擎层（Engine/Model）
  *
  * 分层（P201 重构）：
- *   pet_core  引擎：属性/状态机/行为选择（含帧窗）/事件消费/投喂/持久化。
+ *   pet_core  引擎：属性/状态机/动作选择/事件消费/投喂/持久化。
  *             零 lv_obj 操作（仅 lv_tick_get 计时 + LV_LOG），可被 view/facade 调用。
  *   pet_view  视图：全部 LVGL 对象/timer/input/弹窗/动画渲染（见 pet_view.h）。
  *   dm_pet.c  门面：公共 API + 事件队列（线程边界）+ timer 装配。
@@ -22,22 +22,17 @@
 #include <lvgl/lvgl.h>   /* lv_tick_get（冷却计时） */
 #include <stdbool.h>
 #include "dm_pet.h"
+#include "pet_actions.h"
 
 /****************************************************************************
- * 行为定义：State → Behavior → 帧窗 → Duration → Next
- *
- * 12 帧环按行为语义切窗（afirst..alast 含端点）：同一状态的不同行为
- * 播不同窗，行为才有视觉差异（P201 前行为层有名无形，全态播整环）。
- * afirst < 0 表示整幅 0..PET_FRAMES_PER_STATE-1（EAT/PLAY 等无池状态）。
+ * 自主行为引用完整动作 ID。实际帧数、逐帧时长与循环方式由导入表定义。
  ****************************************************************************/
 typedef struct
 {
-    const char *name;       /* 行为名（调试用） */
-    int         weight;     /* 随机权重 */
-    int         duration;   /* 持续 ticks（1 tick = 500ms 行为节拍） */
-    const char *bubble;     /* 气泡文字（可选） */
-    int         afirst;     /* 动画窗首帧（-1 = 整幅） */
-    int         alast;      /* 动画窗尾帧（含） */
+    const char *name;
+    pet_action_t action;
+    int weight;
+    const char *bubble;
 } pet_behavior_t;
 
 /****************************************************************************
@@ -49,15 +44,12 @@ typedef struct
     void (*show_bubble)(const char *txt, int ticks);
     void (*show_hunger_alert)(void);
     void (*hide_hunger_alert)(void);
+    void (*show_satiety)(void);
 } pet_view_ops_t;
 
 /* 气泡默认显示节拍（engine 请求时长，view 倒计时隐藏；
  * 1 tick = 500ms 行为节拍，12 = 6秒） */
 #define PET_BUBBLE_DURATION_TICKS 12
-
-/* pet_frame_table.c 生成的帧表（view 经 core 只读访问） */
-extern const pet_frame_set_t g_cat_frames[PET_STATE_COUNT];
-extern const pet_walk_set_t  g_cat_walk_frames;
 
 /****************************************************************************
  * 生命周期（门面调用，主线程）
@@ -87,11 +79,16 @@ const char          *pet_core_state_name(dm_pet_state_t s);
 /* 状态层面是否可走（view 再叠加 walk_pause/dragging 得最终“走路中”） */
 bool pet_core_can_walk(void);
 
-/* 当前动画窗 [first..last]（行为窗或整幅；view 检测变化即重播） */
-void pet_core_anim_range(int *first, int *last);
+/* 单调播放实例号：不同状态/行为或同态重播都更新。 */
+uint32_t pet_core_animation_id(void);
+/* 单次动作播放完成；过期播放实例会被忽略。 */
+void pet_core_animation_done(uint32_t instance);
 
-/* 当前宠物类型对应帧集（狗资源就绪前固定猫帧） */
-const pet_frame_set_t *pet_core_frames(void);
+pet_action_t pet_core_action(void);
+bool pet_core_touch_held(void);
+bool pet_core_playing(void);
+bool pet_core_begin_walk(void);
+void pet_core_finish_walk(uint32_t instance);
 
 /****************************************************************************
  * 节拍（门面 timer 驱动，主线程）

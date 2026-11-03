@@ -10,7 +10,8 @@
 
 #define DM_CITY_CFG_KEY   "weather_city_idx"
 
-/* 12 城：idx0=惠州默认；只许追加，禁改既有序号（落盘序号兼容） */
+/* 12 城：idx0=惠州、idx3=北京（当前默认）；只许追加，禁改既有序号
+ * （落盘序号兼容）。默认序号见 dm_city.h 的 DM_CITY_DEFAULT_IDX。 */
 static const dm_city_t g_dm_cities[] = {
     { "惠州", "23.11", "114.42" },
     { "广州", "23.13", "113.26" },
@@ -42,6 +43,20 @@ const dm_city_t *dm_city_get(int idx)
 int dm_city_cur_idx(void)
 {
     int idx = dm_health_cfg_get_int(DM_CITY_CFG_KEY, DM_CITY_DEFAULT_IDX);
+
+    /* 2026-11-02：默认城市由惠州改到北京。已落盘的 0 = 旧默认惠州，
+     * 用户没动过设置，一次性迁到北京并打标记——之后手动选回惠州
+     * 不会被再次改掉。 */
+    if (dm_health_cfg_get_int(DM_CITY_CFG_KEY "_moved", 0) == 0)
+        {
+            if (idx == 0)
+                {
+                    idx = DM_CITY_DEFAULT_IDX;
+                    dm_health_cfg_set_int(DM_CITY_CFG_KEY, idx);
+                }
+            dm_health_cfg_set_int(DM_CITY_CFG_KEY "_moved", 1);
+        }
+
     if (idx < 0 || idx >= DM_CITY_COUNT)
         idx = DM_CITY_DEFAULT_IDX;
     return idx;

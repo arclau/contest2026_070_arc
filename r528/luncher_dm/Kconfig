@@ -15,7 +15,7 @@
 #
 
 config LUNCHER_DM_APP
-	bool "luncher_dm app"
+	bool "DesktopMate YNM-3000 (1920x1200)"
 	default n
 
 	---help---
@@ -44,6 +44,15 @@ config LUNCHER_DM_APP_PRIORITY
 config LUNCHER_DM_APP_STACKSIZE
 	int "luncher_dm stack size"
 	default 102400
+
+config LUNCHER_DM_SIM
+	bool "Build for simulator (stub board HAL/xplayer/WiFi/BT)"
+	default n
+	---help---
+		When enabled, luncher_dm links against sim/stubs (empty XPlayer,
+		PCM, sunxi HAL, fake WiFi/BT) instead of the R528 board stack.
+		Used for goldfish emulator UI development. Board images must
+		leave this OFF.
 
 endif
 

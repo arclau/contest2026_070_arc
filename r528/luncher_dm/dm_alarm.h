@@ -28,6 +28,9 @@ int dm_alarm_add(int hh, int mm, int repeat, int tone);
 void dm_alarm_del(int idx);
 void dm_alarm_set_enabled(int idx, int on);
 /* 铃声表（UI/引擎共用，序号即索引） */
+int dm_alarm_tone_count(void);
+const char *dm_alarm_tone_name(int idx);
+const char *dm_alarm_tone_label(int idx);
 /* 开机调一次：读盘 + 起 1s 检查 timer（常驻，无需清理） */
 void dm_alarm_init(void);
 /* 响铃弹窗按"再响5分钟" */
