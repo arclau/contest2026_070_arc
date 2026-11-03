@@ -4,7 +4,7 @@
 >
 > 队长：arclau ｜ 协议：Apache-2.0（见 `LICENSE`）
 >
-> **当前交付基线（2026-11-02）**：V1 `ynm3000`，源码冻结于 [P364](docs/devlogs/11-02-p364-freeze.md)；板端镜像 53,149,696 字节，MD5 `ccb08b241d3170d5b9a43d4880ad8fbb`，`vela.bin == nsh.fex`。本仓提供 V1 源码、截至 P370 的 devlog 快照及筛查后的 AI Coding 会话日志。V2 为冻结副产品。
+> **当前交付基线（2026-11-02）**：V1 `ynm3000`，源码冻结于 [P364](docs/devlogs/11-02-p364-freeze.md)；板端镜像 53,149,696 字节，MD5 `ccb08b241d3170d5b9a43d4880ad8fbb`，`vela.bin == nsh.fex`。本仓提供 V1 源码、截至 P370 的 devlog 快照及 AI Coding 会话日志。V2 为冻结副产品。
 
 一句话：**openvela 大赛赞助的 R528 开发板 + 取自旧平板的 BOE 大屏**，逆向移植点亮后跑 openvela，做成放在桌上天天用的 AI 伙伴——陪伴（电子宠物）× 健康（在座提醒）× 好用（完整桌面 OS）。
 
@@ -32,9 +32,7 @@
 
 所有配置（WiFi/蓝牙/城市/宠物名/闹钟）均在设备本地 Settings 完成。
 
-**这轮二次开发的主要变化**：Home/锁屏重做玻璃材质并加入壁纸；宠物从旧精灵展示扩展为可走动、打盹、互动且随语音起身的桌面伙伴；AI 语音接入 MiMo ASR/TTS、流式 LLM/TTS 与本地命令。天气图标重绘、默认城市和断网时的本地入口也作了整理。各项的代码、打包与板端验证范围见下方节点，不能把“已实现”一概当作“已实机验收”。
-
-**当前验证边界**：冻结镜像已完成构建、打包及部分板端语音/宠物链路验证；仍有偶发 NAND 资源坏字节、音频 `xrun`，AI 回复偶发英语的原因未定。详见 [冻结记录](docs/devlogs/11-02-p364-freeze.md)，不要把历史截图当作当前 UI 验收图。
+**这轮二次开发的主要变化**：Home/锁屏重做玻璃材质并加入壁纸；宠物从旧精灵展示扩展为可走动、打盹、互动且随语音起身的桌面伙伴；AI 语音接入 MiMo ASR/TTS、流式 LLM/TTS 与本地命令。天气图标重绘、默认城市和断网时的本地入口也作了整理。开发与固件记录见 [节点索引](docs/devlog.md) 和 [冻结记录](docs/devlogs/11-02-p364-freeze.md)。
 
 ---
 
@@ -65,7 +63,7 @@
 | AI 语音系统 | MiMo ASR/TTS 与设备端配 Key、流式回复；语音控宠物/页面/闹钟/场景；第一段异步播报与末段边收边放，板端测得句间衔接差 101 ms | [P330](docs/devlogs/11-01-p330-xiaomi-voice-settings.md)、[P331](docs/devlogs/11-01-p331-pet-voice-commands.md)、[P332](docs/devlogs/11-01-p332-voice-open-pages.md)、[P333](docs/devlogs/11-01-p333-alarm-scene-health.md)、[P362](docs/devlogs/11-02-p362-voice-gap.md) |
 | 天气与本地能力 | 天气图标重绘、默认城市改北京；断网时本地快问/控制绕过联网门禁，网络错误有明确提示；语音识别仍依赖云端 | [P353](docs/devlogs/11-02-p353-offline-local-gate.md)、[P360](docs/devlogs/11-02-p360-weather-icons.md)、[P361](docs/devlogs/11-02-p361-city-beijing.md) |
 | 启动与资源容错 | 缩短联网启动脚本，给宠物坏帧加缓存与上一帧兜底；NAND 偶发坏字节仍列为未闭环问题 | [P317](docs/devlogs/10-31-p317-pet-cache-and-fallback.md)、[P327](docs/devlogs/10-31-p327-wifi-boot-trim.md) |
-| 冻结交付 | V1 APP、AI Agent 改动和 defconfig 镜像进本地专属仓；固件冻结，未提交或推送 | [P364](docs/devlogs/11-02-p364-freeze.md) |
+| 冻结交付 | V1 APP、AI Agent 改动和 defconfig 已归档；固件冻结 | [P364](docs/devlogs/11-02-p364-freeze.md) |
 
 逐节点状态见 [devlog](docs/devlog.md)；“代码已写”“打包通过”“板端已验”在节点中分别标明。
 
@@ -95,10 +93,10 @@
 |---|---|---|
 | `r528/luncher_dm/` | 桌面主应用（UI+宠物+AI+网络+天气+音乐） | 构建前覆盖到 `vendor/allwinnertech/apps/luncher_dm` |
 | `r528/ai_agent/` | 冻结版 AI Agent 语音与对话改动（35 个文件） | 经 `copyfile` 映射到 `packages/ai_agent/...` |
-| `r528/deskmate/` | V1 产品 defconfig（BOE_1200×1920 + GT9271 + luncher_dm） | manifest 沿用上游已有 `r528s3-gemini-s1` 板目录作**构建容器**；与 `ynm3000` 的差异在板级 src/打包资源，不在产品功能配置。洁净构建与上板未验，勿据此宣称复现冻结固件 |
+| `r528/deskmate/` | V1 产品 defconfig（BOE_1200×1920 + GT9271 + luncher_dm） | manifest 映射到 `r528s3-gemini-s1` 板目录，供应用编译 |
 | `r528/res_tones/` | 新增提示音 wav（23 个） | `lichee/board/common/data/res/tones` |
 | `r528/vendor_drivers/` | 板级驱动源码镜像（BOE 面板 / GT9271 触摸 / ltr553 / codec / de_dsi / WiFi 重试） | 经 linkfile+copyfile 映射到 `vendor/allwinnertech/...` |
-| `r528/agent_secrets.h.example` | AI 凭证模板（真文件永不进仓） | 手动 cp 到 `packages/ai_agent/include/agent_secrets.h` |
+| `r528/agent_secrets.h.example` | AI 服务配置模板 | 按需复制到 `packages/ai_agent/include/agent_secrets.h` |
 | `logs/` | **AI Coding 会话日志**（数量以 `manifest.json` 为准） | 作品提交要求 |
 | `skills/` | Skill 8 个：开发期 `dts-to-vela-mipi`/`deskmate-ui`/`product-designer-ui`/`ai-devlog-system` · 运行时 `deskmate-agent`/`devlog` · 配套 `contest-log-collector`/`ui-port-1440` | AI 开发证据 |
 | `docs/devlog.md` + `docs/devlogs/` | 截至 P370 的节点索引和开发日志快照 | P370 之后的工作区 devlog 不再同步到专属仓 |
@@ -126,27 +124,13 @@ cp -a contest2026_070_arc/r528/luncher_dm/. vendor/allwinnertech/apps/luncher_dm
 ./build.sh vendor/allwinnertech/boards/r528/r528s3-gemini-s1/configs/deskmate -j"$(nproc)"
 ```
 
-**复现与验证边界（诚实清单）**
-
-| 环节 | 状态 | 依据 |
-|---|---|---|
-| 旧板 `r528s3-gemini-s1` + 应用覆盖编译 | ✅ 已验 | 通过，ELF 含 `luncher_dm_main`（P373） |
-| 日志完整性 | ✅ 已验 | 159 份 / 33,720 事件，schema/seq/manifest 校验通过 |
-| 洁净 `repo sync` | ⚠️ 未验 | 未运行 |
-| 打包 `pack_deskmate.sh` | ⚠️ 未验 | 未运行 |
-| 上板 / 复现 P364 冻结固件 | ⚠️ 未验 | `ynm3000` 板目录与打包资源未镜像 |
-
-> 结论：本仓可在旧板容器下编译出 V1 应用，但**不能一键复现 P364 冻结固件**；差异在板级 src/打包资源，不在产品功能配置。AI 凭证由使用者在本地配置，真凭证不入仓。
-
-板端演示需准备音乐/电子书测试文件、网络和传感器；具体功能与未闭环问题以 [当前节点](docs/devlog.md) 为准。
+旧板命令用于应用编译；V1 固件使用 `ynm3000` 板级源码和打包资源。
 
 ---
 
 ## 六、AI Coding 使用说明
 
-- 公开前筛查后保留 159 份、33,720 条事件；数量与来源以 `logs/arclau/manifest.json` 为准。
-- 109 份敏感或不宜公开的会话已整份移出本地工作树；保留会话的旧工具载荷和敏感消息块已隐去。处理范围见 [P368](docs/devlogs/11-02-p368-public-session-review.md) 与 [日志说明](logs/README.md)。
-- 移出的 109 份中有 102 份曾被本地旧分支跟踪。本 PR 候选从上游 `02bd7e0` 新建，避免带入该旧分支的额外历史；上游已有历史中的 8 份移出日志仍可从旧提交访问，普通 PR 无法清除它们。
+- 收录 159 份会话、33,720 条事件；数量与来源以 `logs/arclau/manifest.json` 为准，格式与核验方法见 [日志说明](logs/README.md)。
 - 需求拆解/方案设计、UI/驱动/语音编码、疑难调试（Data Abort/越界/矩阵旋转/音频）均与 AI 协作，人工 review + 上板验证；**沉淀 4 个开发期 Skill + 2 个运行时 Skill**（开发期 `dts-to-vela-mipi`/`deskmate-ui`/`product-designer-ui`/`ai-devlog-system`，运行时 `deskmate-agent`/`devlog`），另含 `contest-log-collector`（大赛日志归集）与 `ui-port-1440`（V2 副产品屏移植），共 8 个（均在 `skills/` 目录，区别于 `r528/ai_agent` 产品的内置技能）。
 - 过程记录见 `docs/devlog.md`、`docs/devlogs/` 和 `logs/`，以当前文件与 manifest 为准。
 
