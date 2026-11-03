@@ -329,7 +329,7 @@ def get_fallback_author() -> tuple[str, str]:
                 return comment.split("@")[0], comment
     except Exception:
         pass
-    return "contest-collector", "contest-collector@auto-commit.local"
+    return "contest-collector", "contest-collector@example.com"
 
 
 def process_claude_stdin(stdin_data: dict, tool: str, team_id: str) -> int:

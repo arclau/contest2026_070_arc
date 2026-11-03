@@ -116,7 +116,7 @@ for (const line of lines) {
   console.log(`  ${summary} ${detail}`);
 }
 
-const repoRoot = "/home/mi/contest-log-upload";
+const repoRoot = "/home/user/contest-log-upload";
 const validator = join(repoRoot, "tools", "validate-log.py");
 console.log("\n=== running validator ===");
 try {

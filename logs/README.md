@@ -16,13 +16,13 @@ Codex 原有共享转换器无法解析 `response_item`。补采脚本按原始�
 助手和工具事件，记录源行号；工具入参/结果一律隐去，敏感消息整块遮盖。
 因此补采的 Codex 日志在 manifest 中标为 `degraded`，不能代表完整工具输入输出。
 
-本机有 43 份 CodeBuddy `/data/dm` 会话（约 108 MB）；41 份按原始顺序转换，
+本机有 43 份 CodeBuddy 本工作区会话（约 108 MB）；41 份按原始顺序转换，
 2 份没有 cwd 证据而跳过。工具载荷隐去，敏感消息整块遮盖。
 本仓 schema 已扩展 `codebuddy`，不代表大赛官方 schema 已支持该工具。
 公开前从 268 份中整份移出 109 份：敏感信息、明确的用户操作失误，
 以及本次日志管理会话。旧日志的 4,992 条工具载荷、2,234 条思考字段已隐去；
 另遮盖 273 个敏感消息块、23 个私人目录路径消息块和 24 个归责表述消息块。
-原件与逐份理由、哈希保存在仓外 `/data/dm/output/p368-public-review/`。
+原件与逐份理由、哈希保存在仓外本地工作区（不随仓公开）。
 移出的 109 份中有 102 份曾由本地旧分支跟踪；本 PR 候选从上游基点新建。
 其中 8 份已存在于上游历史；当前文件删除不清除旧提交。
 MiMo Coding 旧导出器曾将来源误标为 `opencode`，需按源 session ID 辨认。
@@ -46,8 +46,8 @@ logs/
 ## 提取与核验
 
 - `skills/contest-log-collector/scripts/export_codex_rollouts.py`：仅收集 session/turn cwd 属于
-  `/data/dm` 的 Codex rollout；支持 `--dry-run`、`--session <ID>` 和 `--refresh`。
-- `skills/contest-log-collector/scripts/export_codebuddy_sessions.py`：仅收集 `data-dm`
+  本工作区的 Codex rollout；支持 `--dry-run`、`--session <ID>` 和 `--refresh`。
+- `skills/contest-log-collector/scripts/export_codebuddy_sessions.py`：仅收集本工作区
   下有 cwd 证据的 CodeBuddy 会话；工具输入/结果不入仓。
 - `skills/contest-log-collector/tools/export-session.py`：已有 OpenCode / Claude Code
   staging 会话的官方导出入口；不得用跨工作区的 `--all` 代替定向采集。
