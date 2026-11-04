@@ -75,7 +75,7 @@
 | 其中应用层 `luncher_dm` 相关提交 | 429 | 同上 |
 | 构建快照标签 `ok-*` | 630 | 对应 523 个不同提交，每次快照为一次构建验证 |
 | 刷机 / 烧录记录 | 166 | devlog 与串口日志中可查 |
-| AI 会话日志 | 184 | 已随本仓 `logs/` 提交，可抽查 |
+| AI 会话日志 | 159 | 33,720 条事件，已随本仓 `logs/` 提交，可抽查 |
 
 本仓只放交付件，提交数远少于实际开发量；上表用来说明过程规模，不替代本仓的可复现性。
 
@@ -150,5 +150,6 @@ cp -a contest2026_070_arc/r528/luncher_dm/. vendor/allwinnertech/apps/luncher_dm
 
 ## 七、提交与官方文档
 
+- 证据索引：[docs/EVIDENCE.md](docs/EVIDENCE.md)——构建命令、验证证据位置、日志抽查方法、未闭环问题。
 - PR 自行 review 合入；首次贡献签 [CLA](https://openvela.com/#/community/cla)（PR 评论 `/check-cla`）。
 - [大赛总览](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/contest_overview.md) ｜ [代码提交指南](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/code_submission_guide.md) ｜ [AI 日志手册](https://github.com/open-vela/docs/blob/dev-ai-contest-2026/zh-cn/contest_2026/ai_coding_log_guide.md)
