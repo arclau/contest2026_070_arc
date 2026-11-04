@@ -13,11 +13,12 @@
 ## 一、作品简介
 
 **openvela 大赛赞助的 R528S3-Gemini-S1 开发板** + **取自旧平板的 BOE 1200×1920 MIPI DSI 屏**（横屏 1920×1200，由安卓 DTB 移植点亮）+ GT9271 触摸 + UART 人体存在传感器 + 喇叭，运行 openvela（NuttX），做成桌面 AI 伙伴。
-<img width="4032" height="3024" alt="IMG_1144" src="https://github.com/user-attachments/assets/de1bef04-36b1-4ffd-a4a4-aea49473fef2" />
+<img width="4032" height="3024" alt="IMG_1978" src="https://github.com/user-attachments/assets/128a0ba6-7725-41df-a551-027b0b2b065d" />
+
 
 **功能概览**（下图为 2026-09 的历史界面，当前 V1 UI 已更新）
-<img width="1920" height="1200" alt="shot_20260912-080812-3" src="https://github.com/user-attachments/assets/fbbf1997-8c43-4146-8a4b-67f20f1191cb" />
-<img width="1920" height="1200" alt="shot_20260912-080802-2" src="https://github.com/user-attachments/assets/8e4b66ea-1451-49f5-a517-95955416f18b" />
+<img width="1920" height="1200" alt="home" src="https://github.com/user-attachments/assets/d3e63238-08ee-4d71-8342-75b3069daf97" />
+<img width="1920" height="1200" alt="lock" src="https://github.com/user-attachments/assets/cc34f7a9-7033-4cf0-a28c-e766fb4d8d37" />
 
 | 模块 | 功能 |
 |---|---|
